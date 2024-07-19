@@ -14,6 +14,13 @@
 
 enum sched_alg_type {block, dt, dh, bf, rnd};
 
+typedef struct Threads_Stats{
+    int id;
+    int static_count;
+    int dynamic_count;
+} * thread_stats;
+
+void* worker_routine(void* arg);
 
 
 
@@ -63,30 +70,86 @@ int main(int argc, char *argv[])
     }
 
     queue_t* wait_q;
-    queue_init(&wait_q, queue_size);
+    queue_init(wait_q, queue_size);
 
-
-    for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, worker, NULL);
-    }
-    // 
     // HW3: Create some threads...
-    //
+    for (int i = 0; i < num_threads; i++) {
+        pthread_create(&threads[i], NULL, worker_routine, NULL);
+    }
 
     listenfd = Open_listenfd(port);
     while (1) {
-	clientlen = sizeof(clientaddr);
-	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
+	    clientlen = sizeof(clientaddr);
+	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
 
-	// 
-	// HW3: In general, don't handle the request in the main thread.
-	// Save the relevant info in a buffer and have one of the worker threads
-	// do the work. 
-	// 
-	requestHandle(connfd);
+        //
+        // HW3: In general, don't handle the request in the main thread.
+        // Save the relevant info in a buffer and have one of the worker threads
+        // do the work.
+        //
+        //requestHandle(connfd); --in the thread
 
-	Close(connfd);
-    free(threads);
+        Close(connfd);
+        if (connfd < 0) { //I wrote this so that code after while is reachable
+            break;
+            //TODO -when to exit while????????????????????????????????????????????
+        }
     }
+    free(threads);
+    queue_destroy(&wait_q);
 
+    return 0;
+}
+
+
+
+void* worker_routine(void* arg) {
+    thread_stats stats = (thread_stats)arg;
+
+    while (1) {
+        request* req = dequeue(wait_q);
+        if (req == NULL) {
+            continue; // No request to process
+        }
+
+        gettimeofday(&req->dispatch_time, NULL); // Record dispatch time
+
+        long dispatch_interval = (req->dispatch_time.tv_sec - req->arrival_time.tv_sec) * 1000 +
+                                 (req->dispatch_time.tv_usec - req->arrival_time.tv_usec) / 1000;
+
+        /* Update thread statistics
+        if (is_static_request(req)) {
+            stats->static_count++;
+        } else {
+            stats->dynamic_count++;
+        }
+        */
+
+        // Process the request
+        requestHandle(req->fd);
+        //TODO - ^MAYBE CHANGE RETURN VALUE OF HANDLE TO BE IS_STATIC (updated by requestParseURI in request.c) TO UPDATE STATS!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+        // Embed statistics in the response headers
+        char headers[1024];
+        snprintf(headers, sizeof(headers),
+                 "Stat-Req-Arrival: %ld.%06ld\r\n"
+                 "Stat-Req-Dispatch: %ld\r\n"
+                 "Stat-Thread-Id: %d\r\n"
+                 "Stat-Thread-Count: %d\r\n"
+                 "Stat-Thread-Static: %d\r\n"
+                 "Stat-Thread-Dynamic: %d\r\n",
+                 req->arrival_time.tv_sec, req->arrival_time.tv_usec,
+                 dispatch_interval,
+                 stats->id,
+                 (stats->static_count + stats->dynamic_count),
+                 stats->static_count,
+                 stats->dynamic_count);
+
+        //send_response(req->fd, headers); // Function to send response with headers
+
+        // Discard the request
+        close(req->fd);
+        free(req);
+    }
 }

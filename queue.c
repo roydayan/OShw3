@@ -25,7 +25,7 @@ void queue_destroy(queue_t *q) {
     pthread_cond_destroy(&(q->cond_empty));
 }
 
-void queue_insert(queue_t *q, int item) {
+void enqueue(queue_t *q, int item) {
     pthread_mutex_lock(&(q->mutex));
     while (q->count + q->running_requests == q->max) {
         pthread_cond_wait(&(q->cond_full), &(q->mutex));
@@ -37,7 +37,7 @@ void queue_insert(queue_t *q, int item) {
     pthread_mutex_unlock(&(q->mutex));
 }
 
-int queue_remove(queue_t *q) {
+int dequeue(queue_t *q) {
     pthread_mutex_lock(&(q->mutex));
     while (q->count == 0) {
         pthread_cond_wait(&(q->cond_empty), &(q->mutex));
