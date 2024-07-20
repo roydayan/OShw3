@@ -19,17 +19,17 @@ typedef struct {
     int max;
     int front;
     int rear;
-    int count;
+    int waiting_requests;
     int running_requests;
     pthread_mutex_t mutex;
     pthread_cond_t cond_full;
     pthread_cond_t cond_empty;
 } queue_t;
 
-void queue_init(queue_t *q, int n);
-void queue_destroy(queue_t *q);
-void enqueue(queue_t *q, int item);
-int dequeue(queue_t *q);
-
+void queueInit(queue_t *q, int n);
+void queueDestroy(queue_t *q);
+void enqueue(queue_t *q, request* item);
+request* dequeue(queue_t *q);
+void decrementRunningRequests(queue_t *q);
 
 #endif //SERVERCLIENTPROJECT_QUEUE_H

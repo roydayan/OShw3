@@ -84,7 +84,8 @@ int main(int argc, char *argv[])
     while (1) {
 	    clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-
+        request* new_request = createRequest(connfd);
+        enqueue(wait_q, new_request);
         //
         // HW3: In general, don't handle the request in the main thread.
         // Save the relevant info in a buffer and have one of the worker threads
@@ -92,7 +93,7 @@ int main(int argc, char *argv[])
         //
         //requestHandle(connfd); --in the thread
 
-        Close(connfd);
+        //Close(connfd);
         if (connfd < 0) { //I wrote this so that code after while is reachable
             break;
             //TODO -when to exit while????????????????????????????????????????????
