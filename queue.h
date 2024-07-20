@@ -15,7 +15,7 @@ typedef struct {
 } request;
 
 typedef struct {
-    int *buf;
+    request **buf;
     int max;
     int front;
     int rear;

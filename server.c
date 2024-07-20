@@ -1,6 +1,7 @@
 #include "segel.h"
 #include "request.h"
 #include "queue.h"
+#include "worker.h"
 
 // 
 // server.c: A very, very simple web server
@@ -14,14 +15,16 @@
 
 enum sched_alg_type {block, dt, dh, bf, rnd};
 
+/* declared in worker.h
 typedef struct Threads_Stats{
     int id;
     int static_count;
     int dynamic_count;
 } * thread_stats;
+ */
 
 void* worker_routine(void* arg);
-
+request* createRequest(int fd);
 
 
 // HW3: Parse the new arguments too
@@ -70,11 +73,11 @@ int main(int argc, char *argv[])
     }
 
     queue_t* wait_q;
-    queue_init(wait_q, queue_size);
+    queueInit(wait_q, queue_size);
 
     // HW3: Create some threads...
     for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, worker_routine, NULL);
+        pthread_create(&threads[i], NULL, worker_routine, wait_q);
     }
 
     listenfd = Open_listenfd(port);
@@ -96,18 +99,30 @@ int main(int argc, char *argv[])
         }
     }
     free(threads);
-    queue_destroy(&wait_q);
+    queueDestroy(&wait_q);
 
     return 0;
 }
 
+request* createRequest(int fd) {
+    request* new_request = (request*)malloc(sizeof(request));
+    if (new_request == NULL) {
+        exit(1);
+        //TODO -what to do if malloc fails???????????
+    }
+    new_request->fd = fd;
+    gettimeofday(&new_request->arrival_time, NULL); // Record arrival time
+    return new_request;
+}
 
-
+/*
 void* worker_routine(void* arg) {
-    thread_stats stats = (thread_stats)arg;
+    thread_stats stats;
+    queue_t * wait_q = (queue_t*) arg;
 
     while (1) {
         request* req = dequeue(wait_q);
+        assert(req != NULL);
         if (req == NULL) {
             continue; // No request to process
         }
@@ -117,13 +132,13 @@ void* worker_routine(void* arg) {
         long dispatch_interval = (req->dispatch_time.tv_sec - req->arrival_time.tv_sec) * 1000 +
                                  (req->dispatch_time.tv_usec - req->arrival_time.tv_usec) / 1000;
 
-        /* Update thread statistics
+         TODO - Update thread statistics
         if (is_static_request(req)) {
             stats->static_count++;
         } else {
             stats->dynamic_count++;
         }
-        */
+
 
         // Process the request
         requestHandle(req->fd);
@@ -149,7 +164,9 @@ void* worker_routine(void* arg) {
         //send_response(req->fd, headers); // Function to send response with headers
 
         // Discard the request
-        close(req->fd);
+        //TODO - lower num of running requests in queue
+        Close(req->fd);
         free(req);
     }
 }
+*/

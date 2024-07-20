@@ -6,8 +6,8 @@
 
 #include <stdlib.h>
 
-void queue_init(queue_t *q, int n) {
-    q->buf = (int *)malloc(sizeof(int) * n);
+void queueInit(queue_t *q, int n) {
+    q->buf = (request **)malloc(sizeof(request*) * n);
     q->max = n;
     q->front = 0;
     q->rear = 0;
@@ -18,14 +18,19 @@ void queue_init(queue_t *q, int n) {
     pthread_cond_init(&(q->cond_empty), NULL);
 }
 
-void queue_destroy(queue_t *q) {
+void queueDestroy(queue_t *q) {
+    for (int i = 0; i < q->max; i++) {
+        if(q->buf[i] != NULL) {
+            free(q->buf[i]);
+        }
+    }
     free(q->buf);
     pthread_mutex_destroy(&(q->mutex));
     pthread_cond_destroy(&(q->cond_full));
     pthread_cond_destroy(&(q->cond_empty));
 }
-
-void enqueue(queue_t *q, int item) {
+//TODO -- implement a different queue function for each of the algorithms: block, drop_tail , etc
+void enqueue(queue_t *q, request* item) {
     pthread_mutex_lock(&(q->mutex));
     while (q->count + q->running_requests == q->max) {
         pthread_cond_wait(&(q->cond_full), &(q->mutex));
@@ -46,7 +51,7 @@ int dequeue(queue_t *q) {
     q->front = (q->front + 1) % q->max;
     q->count--;
     q->running_requests++;
-    pthread_cond_signal(&(q->cond_full));
+    //pthread_cond_signal(&(q->cond_full)); TODO - ensure this is safe (no race condition, deadlock...)!!!!!!!!!
     pthread_mutex_unlock(&(q->mutex));
     return item;
 }
