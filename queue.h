@@ -6,6 +6,7 @@
 #define SERVERCLIENTPROJECT_QUEUE_H
 
 #include <pthread.h>
+#include "segel.h"
 
 typedef struct {
     int fd; // File descriptor for the client connection
