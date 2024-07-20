@@ -6,7 +6,8 @@
 
 #include <stdlib.h>
 
-void queueInit(queue_t *q, int n) {
+queue_t* queueInit(int n) {
+    queue_t* q = (queue_t*)malloc(sizeof(queue_t));
     q->buf = (request **)malloc(sizeof(request*) * n);
     q->max = n;
     q->front = 0;
@@ -16,6 +17,7 @@ void queueInit(queue_t *q, int n) {
     pthread_mutex_init(&(q->mutex), NULL);
     pthread_cond_init(&(q->cond_full), NULL);
     pthread_cond_init(&(q->cond_empty), NULL);
+    return q;
 }
 
 void queueDestroy(queue_t *q) {
@@ -28,6 +30,7 @@ void queueDestroy(queue_t *q) {
     pthread_mutex_destroy(&(q->mutex));
     pthread_cond_destroy(&(q->cond_full));
     pthread_cond_destroy(&(q->cond_empty));
+    free(q);
 }
 //TODO -- implement a different queue function for each of the algorithms: block, drop_tail , etc
 void enqueue(queue_t *q, request* item) {

@@ -21,9 +21,8 @@ typedef struct Threads_Stats{
     int static_count;
     int dynamic_count;
 } * thread_stats;
- */
-
-void* worker_routine(void* arg);
+void* worker_thread(void* arg);
+*/
 request* createRequest(int fd);
 
 
@@ -66,21 +65,21 @@ int main(int argc, char *argv[])
     getargs(&port, &queue_size, &sched_alg, &num_threads, argc, argv);
 
 
+
     pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * num_threads);
     if(threads == NULL){
         exit(1);
         //TODO -what to do if malloc fails?
     }
 
-    queue_t* wait_q;
-    queueInit(wait_q, queue_size);
+    queue_t* wait_q = queueInit(queue_size);
 
     // HW3: Create some threads...
     for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, worker_routine, wait_q);
+        pthread_create(&threads[i], NULL, worker_thread, wait_q);
     }
 
-    listenfd = Open_listenfd(port);
+    listenfd = Open_listenfd(port); //error - bind failed 7/20/2024 14:46, server ran without client might be reason, simply for checking validity
     while (1) {
 	    clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);

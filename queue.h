@@ -27,7 +27,7 @@ typedef struct {
     pthread_cond_t cond_empty;
 } queue_t;
 
-void queueInit(queue_t *q, int n);
+queue_t* queueInit(int n);
 void queueDestroy(queue_t *q);
 void enqueue(queue_t *q, request* item);
 request* dequeue(queue_t *q);
