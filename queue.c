@@ -45,7 +45,7 @@ void enqueue(queue_t *q, request* item) {
     pthread_mutex_unlock(&(q->mutex));
 }
 
-request* dequeue(queue_t *q) {
+request* dequeue(queue_t *q) { //TODO - make sure valid when there is one request left - can front be less than rear? is it okay?!!!!
     pthread_mutex_lock(&(q->mutex));
     while (q->waiting_requests + q->running_requests == 0) {
         pthread_cond_wait(&(q->cond_empty), &(q->mutex));
@@ -67,6 +67,30 @@ void decrementRunningRequests(queue_t *q) {
     pthread_mutex_unlock(&(q->mutex));
 }
 
+//dequeue latest request (performed when request filename suffix is .skip)
+request* dequeueLatest(queue_t *q) {
+    pthread_mutex_lock(&(q->mutex));
+    while (q->waiting_requests + q->running_requests == 0) {
+        pthread_cond_wait(&(q->cond_empty), &(q->mutex));
+    }
+    request *item = q->buf[q->rear];
+    q->buf[q->rear] = NULL;
+    q->rear = (q->rear - 1) % q->max;
+    q->waiting_requests--;
+    q->running_requests++;
+    //pthread_cond_signal(&(q->cond_full)); TODO - ensure this is safe (no race condition, deadlock...)!!!!!!!!!
+    pthread_mutex_unlock(&(q->mutex));
+    return item;
+}
 
 
-
+request* createRequest(int fd) {
+    request* new_request = (request*)malloc(sizeof(request));
+    if (new_request == NULL) {
+        exit(1);
+        //TODO -what to do if malloc fails???????????
+    }
+    new_request->fd = fd;
+    gettimeofday(&new_request->arrival_time, NULL); // Record arrival time
+    return new_request;
+}

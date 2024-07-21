@@ -26,8 +26,13 @@ typedef struct {
     int index;
 } arg_array;
 
-
-
+//check special suffix
+int checkSkipSuffix(int fd) {//TODO - implement this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    return 0;
+}
+//remove special suffix for current request
+void removeSkipSuffix(int fd) {//TODO - implement this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+}
 
 void* worker_thread(void* arg) {
     //init thread stats
@@ -41,10 +46,23 @@ void* worker_thread(void* arg) {
     queue_t *wait_q = args->queue_ptr;
     //queue_t *wait_q = (queue_t*) arg;
 
+    request* next_req = NULL; //for special suffix policy
     //thread routine:
     while (1) {
-        request* req = dequeue(wait_q);
+        request* req = NULL;
+        //check if skipping:
+        if (next_req == NULL) {
+            req = dequeue(wait_q);
+        }
+        else {
+            req = next_req;
+            next_req = NULL; //reset before next iteration!, freed when req is freed
+        }
         assert(req != NULL);
+        if (checkSkipSuffix(req->fd)) {
+            removeSkipSuffix(req->fd);
+            next_req = dequeueLatest(wait_q);
+        }
 
         gettimeofday(&req->dispatch_time, NULL); // Record dispatch time
 
@@ -54,6 +72,8 @@ void* worker_thread(void* arg) {
         // Process the request, thread stats are updated in requestHandle through the t_stats ptr
         requestHandle(req->fd, req->arrival_time, req->dispatch_time, t_stats); //TODO - change dispatch time to dispatch interval (long or struct timeval???) !!!!!!!!
         // response is embedded in fd
+
+
 
         // Discard the request
         Close(req->fd);

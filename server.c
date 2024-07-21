@@ -15,16 +15,6 @@
 
 enum sched_alg_type {block, dt, dh, bf, rnd};
 
-/* declared in worker.h
-typedef struct Threads_Stats{
-    int id;
-    int static_count;
-    int dynamic_count;
-} * thread_stats;
-void* worker_thread(void* arg);
-*/
-request* createRequest(int fd);
-
 
 // HW3: Parse the new arguments too
 //./server [portnum] [threads] [queue_size] [sched_alg]
@@ -84,7 +74,7 @@ int main(int argc, char *argv[])
     while (1) {
 	    clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-        request* new_request = createRequest(connfd);
+        request* new_request = createRequest(connfd);  //request is defined in queue.h
         enqueue(wait_q, new_request);
 
         // HW3: In general, don't handle the request in the main thread.
@@ -102,17 +92,6 @@ int main(int argc, char *argv[])
     queueDestroy(wait_q);
 
     return 0;
-}
-
-request* createRequest(int fd) {
-    request* new_request = (request*)malloc(sizeof(request));
-    if (new_request == NULL) {
-        exit(1);
-        //TODO -what to do if malloc fails???????????
-    }
-    new_request->fd = fd;
-    gettimeofday(&new_request->arrival_time, NULL); // Record arrival time
-    return new_request;
 }
 
 /*

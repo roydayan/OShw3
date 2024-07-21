@@ -15,6 +15,9 @@ typedef struct {
     // Other request-related fields
 } request;
 
+request* createRequest(int fd);
+
+
 typedef struct {
     request **buf;
     int max;
@@ -32,5 +35,7 @@ void queueDestroy(queue_t *q);
 void enqueue(queue_t *q, request* item);
 request* dequeue(queue_t *q);
 void decrementRunningRequests(queue_t *q);
+request* dequeueLatest(queue_t *q);
+
 
 #endif //SERVERCLIENTPROJECT_QUEUE_H
