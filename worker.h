@@ -11,16 +11,37 @@
 #include "segel.h"
 #include "assert.h"
 
-typedef struct Threads_stats{
+/* defined in request.h:
+typedef struct Thread_stats {
     int id;
-    int static_count;
-    int dynamic_count;
-} * thread_stats;
+    int stat_req;
+    int dynm_req;
+    int total_req;
+} *thread_stats;
+ */
+
+//struct to pass arguments to thread
+typedef struct {
+    queue_t* queue_ptr;
+    int index;
+} arg_array;
+
+
 
 
 void* worker_thread(void* arg) {
-    thread_stats stats;
-    queue_t *wait_q = (queue_t*) arg;
+    //init thread stats
+    threads_stats t_stats = (threads_stats) malloc(sizeof(struct Threads_stats));
+    t_stats->stat_req = 0;
+    t_stats->dynm_req = 0;
+    t_stats->total_req = 0;
+    arg_array *args = (arg_array*) arg;
+    t_stats->id = args->index;
+
+    queue_t *wait_q = args->queue_ptr;
+    //queue_t *wait_q = (queue_t*) arg;
+
+    //thread routine:
     while (1) {
         request* req = dequeue(wait_q);
         assert(req != NULL);
@@ -30,44 +51,16 @@ void* worker_thread(void* arg) {
         long dispatch_interval = (req->dispatch_time.tv_sec - req->arrival_time.tv_sec) * 1000 +
                                  (req->dispatch_time.tv_usec - req->arrival_time.tv_usec) / 1000;
 
-        /* TODO - Update thread statistics
-        if (is_static_request(req)) {
-            stats->static_count++;
-        } else {
-            stats->dynamic_count++;
-        }
-        */
-
-        // Process the request
-        requestHandle(req->fd);
-        //TODO - ^MAYBE CHANGE RETURN VALUE OF HANDLE TO BE IS_STATIC (updated by requestParseURI in request.c) TO UPDATE STATS!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-        // Embed statistics in the response headers
-        char headers[1024];
-        snprintf(headers, sizeof(headers),
-                 "Stat-Req-Arrival: %ld.%06ld\r\n"
-                 "Stat-Req-Dispatch: %ld\r\n"
-                 "Stat-Thread-Id: %d\r\n"
-                 "Stat-Thread-Count: %d\r\n"
-                 "Stat-Thread-Static: %d\r\n"
-                 "Stat-Thread-Dynamic: %d\r\n",
-                 req->arrival_time.tv_sec, req->arrival_time.tv_usec,
-                 dispatch_interval,
-                 stats->id,
-                 (stats->static_count + stats->dynamic_count),
-                 stats->static_count,
-                 stats->dynamic_count);
-        //TODO - rio_writen???
-
-        //send_response(req->fd, headers); // Function to send response with headers
+        // Process the request, thread stats are updated in requestHandle through the t_stats ptr
+        requestHandle(req->fd, req->arrival_time, req->dispatch_time, t_stats); //TODO - change dispatch time to dispatch interval (long or struct timeval???) !!!!!!!!
+        // response is embedded in fd
 
         // Discard the request
         Close(req->fd);
         free(req);
         decrementRunningRequests(wait_q);
-
     }
+    free(t_stats);
 }
 
 #endif //SERVERCLIENTPROJECT_WORKER_H

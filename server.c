@@ -64,8 +64,6 @@ int main(int argc, char *argv[])
 
     getargs(&port, &queue_size, &sched_alg, &num_threads, argc, argv);
 
-
-
     pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * num_threads);
     if(threads == NULL){
         exit(1);
@@ -75,8 +73,11 @@ int main(int argc, char *argv[])
     queue_t* wait_q = queueInit(queue_size);
 
     // HW3: Create some threads...
+    arg_array args; //pass arguments to thread, arg_array is defined in worker.h
+    args.queue_ptr = wait_q;
     for (int i = 0; i < num_threads; i++) {
-        pthread_create(&threads[i], NULL, worker_thread, wait_q);
+        args.index = i;
+        pthread_create(&threads[i], NULL, worker_thread, &args);
     }
 
     listenfd = Open_listenfd(port); //error - bind failed 7/20/2024 14:46, server ran without client might be reason, simply for checking validity
@@ -85,21 +86,20 @@ int main(int argc, char *argv[])
 	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
         request* new_request = createRequest(connfd);
         enqueue(wait_q, new_request);
-        //
+
         // HW3: In general, don't handle the request in the main thread.
         // Save the relevant info in a buffer and have one of the worker threads
         // do the work.
-        //
         //requestHandle(connfd); --in the thread
+        //Close(connfd); --in the thread
 
-        //Close(connfd);
-        if (connfd < 0) { //I wrote this so that code after while is reachable
+        if (connfd < 0) { //TODO - get rid of this. I wrote this so that code after while is reachable
             break;
             //TODO -when to exit while????????????????????????????????????????????
         }
     }
     free(threads);
-    queueDestroy(&wait_q);
+    queueDestroy(wait_q);
 
     return 0;
 }
