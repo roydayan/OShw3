@@ -59,7 +59,7 @@ void* worker_thread(void* arg) {
             next_req = NULL; //reset before next iteration!, freed when req is freed
         }
         assert(req != NULL);
-        t_stats->total_req++;
+        t_stats->total_req++; //TODO - update total requests here or in requestHandle??
         if (checkSkipSuffix(req->fd)) {
             removeSkipSuffix(req->fd);
             next_req = dequeueLatest(wait_q);
