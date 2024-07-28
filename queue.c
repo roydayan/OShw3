@@ -175,6 +175,28 @@ void removeAtIndex(queue_t* q, int index){
 }
 
 
+//dequeue latest request (performed when request filename suffix is .skip)
+request_t* dequeueLatest(queue_t *q) {
+    pthread_mutex_lock(&(q->mutex));
+    while (q->waiting_requests == 0) {
+        pthread_mutex_unlock(&(q->mutex)); //TODO -check need for cond_wait!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        return NULL; //TODO - if during skip the queue is empty then "ignore the skip action and move on" (piazza 435) - does it mean to return NULL here???
+        //pthread_cond_wait(&(q->cond_empty), &(q->mutex));
+    }
+    request_t* tmp = q->back;
+    q->back = q->back->next_request;
+    if (q->back == NULL){
+        q->front = NULL;
+    }
+    gettimeofday(&tmp->dispatch_time, NULL);
+    q->waiting_requests--;
+    q->running_requests++;
+    pthread_mutex_unlock(&(q->mutex));
+    return tmp;
+}
+
+
+
 //enum sched_alg_type {block, dt, dh, bf, rnd};
 void enqueueAccordingToAlgorithm(queue_t* q, request_t *new_request, enum sched_alg_type sched_alg){
     switch (sched_alg) {
