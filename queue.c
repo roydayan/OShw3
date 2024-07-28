@@ -202,10 +202,10 @@ request_t* dequeueLatest(queue_t *q) {
     }
     request_t* tmp = q->back;
     q->back = q->back->next_request;
+    gettimeofday(&tmp->dispatch_time, NULL);
     if (q->back == NULL){
         q->front = NULL;
     }
-    gettimeofday(&tmp->dispatch_time, NULL);
     q->waiting_requests--;
     q->running_requests++;
     pthread_mutex_unlock(&(q->mutex));
@@ -255,7 +255,7 @@ request_t* dequeue(queue_t *q) {
     }
     request_t* request = q->front;
     removeFront(q);
-
+    gettimeofday(&request->dispatch_time, NULL);
     q->waiting_requests--;
     q->running_requests++;
     //pthread_cond_signal(&(q->cond_full)); TODO - ensure this is safe (no race condition, deadlock...)!!!!!!!!!
