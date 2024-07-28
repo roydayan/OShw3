@@ -70,8 +70,9 @@ void decrementRunningRequests(queue_t *q) {
 //dequeue latest request (performed when request filename suffix is .skip)
 request* dequeueLatest(queue_t *q) {
     pthread_mutex_lock(&(q->mutex));
-    while (q->waiting_requests + q->running_requests == 0) {
-        pthread_cond_wait(&(q->cond_empty), &(q->mutex));
+    while (q->waiting_requests == 0) {
+        return NULL; //TODO - if during skip the queue is empty then "ignore the skip action and move on" (piazza 435) - does it mean to return NULL here???
+        //pthread_cond_wait(&(q->cond_empty), &(q->mutex));
     }
     request *item = q->buf[q->rear];
     q->buf[q->rear] = NULL;

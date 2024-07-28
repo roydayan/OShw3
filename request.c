@@ -28,7 +28,6 @@ void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longm
 
     sprintf(buf, "Content-Length: %lu\r\n", strlen(body));
 
-
     sprintf(buf, "%sStat-Req-Arrival:: %lu.%06lu\r\n", buf, arrival.tv_sec, arrival.tv_usec);
 
     sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, dispatch.tv_sec, dispatch.tv_usec);
@@ -108,7 +107,7 @@ void requestGetFiletype(char *filename, char *filetype)
         strcpy(filetype, "image/gif");
     else if (strstr(filename, ".jpg"))
         strcpy(filetype, "image/jpeg");
-    //TODO - add SKIP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //TODO - add SKIP??????!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     else
         strcpy(filetype, "text/plain");
 }
@@ -189,6 +188,7 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 // handle a request
 void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
+    t_stats->total_req++;
     int is_static;
     struct stat sbuf;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];

@@ -14,6 +14,8 @@
 /* defined in request.h:
 typedef struct Thread_stats {
     int id;
+    queue_t* wait_q;
+
     int stat_req;
     int dynm_req;
     int total_req;
@@ -59,13 +61,13 @@ void* worker_thread(void* arg) {
             next_req = NULL; //reset before next iteration!, freed when req is freed
         }
         assert(req != NULL);
-        t_stats->total_req++; //TODO - update total requests here or in requestHandle??
+        //t_stats->total_req++; //TODO - update total requests here or in requestHandle?? right now in requestHandle
         if (checkSkipSuffix(req->fd)) {
+            next_req = dequeueLatest(wait_q); //first, save the last request
             removeSkipSuffix(req->fd);
-            next_req = dequeueLatest(wait_q);
         }
 
-        gettimeofday(&req->dispatch_time, NULL); // Record dispatch time
+        gettimeofday(&req->dispatch_time, NULL); // Record dispatch time. TODO - maybe do this in dequeue?!!!
 
         long dispatch_interval = (req->dispatch_time.tv_sec - req->arrival_time.tv_sec) * 1000 +
                                  (req->dispatch_time.tv_usec - req->arrival_time.tv_usec) / 1000;
