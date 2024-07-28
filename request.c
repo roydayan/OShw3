@@ -286,7 +286,7 @@ void enqueue(queue_t *q, request* item) {
 
 request* dequeue(queue_t *q) { //TODO - make sure valid when there is one request left - can front be less than rear? is it okay?!!!!
     pthread_mutex_lock(&(q->mutex));
-    while (q->waiting_requests + q->running_requests == 0) {
+    while (q->waiting_requests == 0) {
         pthread_cond_wait(&(q->cond_empty), &(q->mutex));
     }
     request *item = q->buf[q->front];
@@ -312,6 +312,7 @@ void decrementRunningRequests(queue_t *q) {
 request* dequeueLatest(queue_t *q) {
     pthread_mutex_lock(&(q->mutex));
     while (q->waiting_requests == 0) {
+        pthread_mutex_unlock(&(q->mutex)); //TODO -check need for cond_wait!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         return NULL; //TODO - if during skip the queue is empty then "ignore the skip action and move on" (piazza 435) - does it mean to return NULL here???
         //pthread_cond_wait(&(q->cond_empty), &(q->mutex));
     }
@@ -335,6 +336,6 @@ request* createRequest(int fd) {
         exit(1);
     }
     new_request->fd = fd;
-    gettimeofday(&new_request->arrival_time, NULL); // Record arrival time
+    //gettimeofday(&new_request->arrival_time, NULL); // Record arrival time PERFORMED IN MAIN
     return new_request;
 }

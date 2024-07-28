@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     queue_t* wait_q = queueInit(queue_size);
 
     // HW3: Create some threads...
-    for (int i = 1; i <= num_threads; i++) {
+    for (int i = 0; i < num_threads; i++) {
         threads_stats t_stats = (threads_stats) malloc(sizeof(struct Threads_stats));
         if(threads == NULL){
             fprintf(stderr, "malloc threads_stats failed");
@@ -75,13 +75,15 @@ int main(int argc, char *argv[])
         t_stats->wait_q = wait_q;
         pthread_create(&threads[i], NULL, worker_thread, (void*)t_stats);
     }
+    struct timeval temp_arrival_time; //for immediate time recording
 
     listenfd = Open_listenfd(port); //error - bind failed 7/20/2024 14:46, server ran without client might be reason, simply for checking validity
     while (1) {
 	    clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
+        gettimeofday(&temp_arrival_time, NULL); // Record arrival time
         request* new_request = createRequest(connfd);  //request is defined in queue.h
-        gettimeofday(&(new_request->arrival_time), NULL); // Record arrival time
+        new_request->arrival_time = temp_arrival_time; //update the arrival time to be exact
         enqueue(wait_q, new_request);
 
         // HW3: In general, don't handle the request in the main thread.
@@ -125,13 +127,13 @@ void* worker_thread(void* arg) {
             req = t_stats->next_req;
             t_stats->next_req = NULL; //reset before next iteration!, freed when req is freed
         }
-        assert(req != NULL);
+        assert(req != NULL); //maybe if req==NULL then break??
 
         struct timeval dispatch_interval;
         timersub(&req->dispatch_time, &req->arrival_time, &dispatch_interval); // Calculate dispatch interval (according to chatgpt)
 
         // Process the request, thread stats are updated in requestHandle through the t_stats ptr, response will be embedded in fd
-        requestHandle(req->fd, req->arrival_time, dispatch_interval, t_stats); //TODO - change dispatch time to dispatch interval (long or struct timeval???) !!!!!!!!
+        requestHandle(req->fd, req->arrival_time, dispatch_interval, t_stats);
 
         // Discard the request
         Close(req->fd);
