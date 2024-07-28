@@ -26,6 +26,7 @@
 /*
  * Send an HTTP request for the specified file 
  */
+
 void clientSend(int fd, char *filename)
 {
   char buf[MAXLINE];
@@ -73,39 +74,65 @@ void clientPrint(int fd)
 
 int main(int argc, char *argv[])
 {
-  char *host, *filename;
-  int port;
-  int clientfd;
+    char *host, *filename;
+    int port;
+    int clientfd;
 
-  if (argc != 4) {
-    fprintf(stderr, "Usage: %s <host> <port> <filename>\n", argv[0]);
-    exit(1);
-  }
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <host> <port> <filename>\n", argv[0]);
+        exit(1);
+    }
 
-  host = argv[1];
-  port = atoi(argv[2]);
-  filename = argv[3];
-  pid_t pids[10];
-  pid_t pid;
-  for (int i = 0; i < 10 ; i ++){
-      pid = fork();
-      if(pid > 0 ){
-          pids[i] = pid;
-          break;
-      }
-  }
-  /* Open a single connection to the specified host and port */
-  clientfd = Open_clientfd(host, port);
-  
-  clientSend(clientfd, filename);
-  clientPrint(clientfd);
-    
-  Close(clientfd);
+    host = argv[1];
+    port = atoi(argv[2]);
+    filename = argv[3];
 
-  if(pid == 0){
-      for (int i = 0 ; i < 10 ; i++){
-          waitpid(pids[i],NULL, 0);
-      }
-  }
-  exit(0);
+    /* Open a single connection to the specified host and port */
+    clientfd = Open_clientfd(host, port);
+
+    clientSend(clientfd, filename);
+    clientPrint(clientfd);
+
+    Close(clientfd);
+
+    exit(0);
 }
+
+/*
+char *host, *filename;
+int port;
+int clientfd;
+
+if (argc != 4) {
+ fprintf(stderr, "Usage: %s <host> <port> <filename>\n", argv[0]);
+ exit(1);
+}
+
+host = argv[1];
+port = atoi(argv[2]);
+filename = argv[3];
+pid_t pids[10];
+pid_t pid;
+for (int i = 0; i < 10 ; i ++){
+   pid = fork();
+   if(pid > 0 ){
+       pids[i] = pid;
+       break;
+   }
+}
+// Open a single connection to the specified host and port
+clientfd = Open_clientfd(host, port);
+
+clientSend(clientfd, filename);
+clientPrint(clientfd);
+
+Close(clientfd);
+
+if(pid == 0){
+   for (int i = 0 ; i < 10 ; i++){
+       waitpid(pids[i],NULL, 0);
+   }
+}
+exit(0);
+}
+*/

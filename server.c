@@ -77,26 +77,28 @@ int main(int argc, char *argv[])
     queue_t* wait_q = (queue_t*)malloc(sizeof (queue_t));
     queueInit(wait_q, queue_size);
 
-    threads_stats* t_stats_array = (threads_stats*) malloc(num_threads*sizeof(struct Threads_stats));
+    //array of thread stats that will pass as arguments to worker threads
+    threads_stats* t_stats_array = (threads_stats*) malloc(sizeof(threads_stats) * num_threads);
     if(t_stats_array == NULL){
-        fprintf(stderr, "malloc threads_stats failed");
+        fprintf(stderr, "malloc threads_stats_array failed");
         exit(1);
     }
 
     // HW3: Create some threads...
     for (int i = 0; i < num_threads; i++) {
         t_stats_array[i] = (threads_stats)malloc(sizeof(struct Threads_stats));
-        threads_stats t_stats = t_stats_array[i];
-        if(threads == NULL){
+        if(t_stats_array[i] == NULL){
             fprintf(stderr, "malloc threads_stats failed");
             exit(1);
         }
+        threads_stats t_stats = t_stats_array[i];
         t_stats->id = i;
         t_stats->wait_q = wait_q;
         pthread_create(&threads[i], NULL, worker_routine, (void*)t_stats);
         //TODO-- what if pthread_create fails??
     }
-    struct timeval temp_arrival_time; //for immediate time recording
+
+    struct timeval temp_arrival_time; //temporary variable for immediate time recording
 
     listenfd = Open_listenfd(port);
     while (1) {
