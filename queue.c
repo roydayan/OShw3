@@ -94,6 +94,7 @@ void enqueueBlock(queue_t *q, request_t* new_request) {
 void enqueueDropTail(queue_t *q, request_t* new_request) {
     pthread_mutex_lock(&(q->mutex));
     if(q->waiting_requests + q->running_requests == q->max_size){
+        pthread_mutex_unlock(&(q->mutex));
         return;
     }
     insertAtBack(q, new_request);
@@ -103,10 +104,18 @@ void enqueueDropTail(queue_t *q, request_t* new_request) {
 
 void enqueueDropHead(queue_t *q, request_t* new_request) {
     pthread_mutex_lock(&(q->mutex));
-    if(q->waiting_requests + q->running_requests == q->max_size && q->waiting_requests > 0){
-        request_t * oldest_request = q->front;
-        removeFront(q);
-        dropRequest(oldest_request);
+    if(q->waiting_requests + q->running_requests == q->max_size){
+        if(q->waiting_requests > 0){
+            request_t * oldest_request = q->front;
+            removeFront(q);
+            dropRequest(oldest_request);
+        }
+        else{//TODO-- according to piazza this case wont be tested...
+            dropRequest(new_request);
+            pthread_mutex_unlock(&(q->mutex));
+            return;
+        }
+
     }
     insertAtBack(q, new_request);
     pthread_cond_signal(&(q->cond_empty));
@@ -126,12 +135,20 @@ void enqueueBlockFlush(queue_t *q, request_t* new_request){
 
 void enqueueDropRandom(queue_t *q, request_t *new_request){
     pthread_mutex_lock(&(q->mutex));
-    if(q->waiting_requests + q->running_requests == q->max_size && q->waiting_requests > 0){
+    if(q->waiting_requests + q->running_requests == q->max_size){
+        if(q->waiting_requests == 0){//TODO-- according to piazza this shouldn't happen
+            dropRequest(new_request);
+            pthread_mutex_unlock(&(q->mutex));
+            return;
+        }
         //remove randomly half of elements in waiting queue
         int half_initial_size = (int) ((q->waiting_requests) / 2);
         half_initial_size = half_initial_size > 0 ? half_initial_size : 1;
 
         for( int i = 0 ; i < half_initial_size; i++) {
+            if(q->waiting_requests == 0){
+                break;
+            }
             int random_index = rand() % q->waiting_requests;
             removeAtIndex(q, random_index);
             q->waiting_requests--;
