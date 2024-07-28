@@ -142,8 +142,14 @@ void enqueueDropRandom(queue_t *q, request_t *new_request){
             return;
         }
         //remove randomly half of elements in waiting queue
-        int half_initial_size = (int) ((q->waiting_requests) / 2);
-        half_initial_size = half_initial_size > 0 ? half_initial_size : 1;
+        int half_initial_size = 1;
+        if( (q->waiting_requests % 2) == 0){
+            half_initial_size = (int) ((q->waiting_requests) / 2);
+        }
+        else{
+            half_initial_size = (int) ((q->waiting_requests+1) / 2);
+        }
+        //half_initial_size = half_initial_size > 0 ? half_initial_size : 1;
 
         for( int i = 0 ; i < half_initial_size; i++) {
             if(q->waiting_requests == 0){
