@@ -85,7 +85,15 @@ int main(int argc, char *argv[])
   host = argv[1];
   port = atoi(argv[2]);
   filename = argv[3];
-
+  pid_t pids[10];
+  pid_t pid;
+  for (int i = 0; i < 10 ; i ++){
+      pid = fork();
+      if(pid > 0 ){
+          pids[i] = pid;
+          break;
+      }
+  }
   /* Open a single connection to the specified host and port */
   clientfd = Open_clientfd(host, port);
   
@@ -94,5 +102,10 @@ int main(int argc, char *argv[])
     
   Close(clientfd);
 
+  if(pid == 0){
+      for (int i = 0 ; i < 10 ; i++){
+          waitpid(pids[i],NULL, 0);
+      }
+  }
   exit(0);
 }

@@ -13,7 +13,7 @@
 // Most of the work is done within routines written in request.c
 //
 
-enum sched_alg_type {block, dt, dh, bf, rnd};
+//enum sched_alg_type {block, dt, dh, bf, rnd};
 
 /* declared in worker.h
 typedef struct Threads_Stats{
@@ -23,8 +23,8 @@ typedef struct Threads_Stats{
 } * thread_stats;
  */
 
-void* worker_routine(void* arg);
-request* createRequest(int fd);
+//void* worker_routine(void* arg);
+request_t* createRequest(int fd);
 
 
 // HW3: Parse the new arguments too
@@ -72,11 +72,12 @@ int main(int argc, char *argv[])
         //TODO -what to do if malloc fails?
     }
 
-    queue_t* wait_q;
+    queue_t* wait_q = (queue_t*)malloc(sizeof (queue_t));
     queueInit(wait_q, queue_size);
 
     // HW3: Create some threads...
     for (int i = 0; i < num_threads; i++) {
+        //TODO-- what if pthread_create fails??
         pthread_create(&threads[i], NULL, worker_routine, wait_q);
     }
 
@@ -84,8 +85,8 @@ int main(int argc, char *argv[])
     while (1) {
 	    clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-        request* new_request = createRequest(connfd);
-        enqueue(wait_q, new_request);
+        request_t* new_request = createRequest(connfd);
+        enqueueAccordingToAlgorithm(wait_q, new_request, sched_alg);
         //
         // HW3: In general, don't handle the request in the main thread.
         // Save the relevant info in a buffer and have one of the worker threads
@@ -100,18 +101,19 @@ int main(int argc, char *argv[])
         }
     }
     free(threads);
-    queueDestroy(&wait_q);
+    queueDestroy(wait_q);
 
     return 0;
 }
 
-request* createRequest(int fd) {
-    request* new_request = (request*)malloc(sizeof(request));
+request_t* createRequest(int fd) {
+    request_t* new_request = (request_t*)malloc(sizeof(request_t));
     if (new_request == NULL) {
         exit(1);
         //TODO -what to do if malloc fails???????????
     }
     new_request->fd = fd;
+    new_request->next_request =NULL;
     gettimeofday(&new_request->arrival_time, NULL); // Record arrival time
     return new_request;
 }

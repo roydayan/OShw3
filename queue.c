@@ -6,64 +6,333 @@
 
 #include <stdlib.h>
 
-void queueInit(queue_t *q, int n) {
-    q->buf = (request **)malloc(sizeof(request*) * n);
-    q->max = n;
-    q->front = 0;
-    q->rear = 0;
+
+void queueInit(queue_t *q, int max_size) {
+    q->max_size = max_size;
+    //q->size = 0;
+    q->front = NULL;
+    q->back = NULL;
     q->waiting_requests = 0;
     q->running_requests = 0;
     pthread_mutex_init(&(q->mutex), NULL);
     pthread_cond_init(&(q->cond_full), NULL);
     pthread_cond_init(&(q->cond_empty), NULL);
+    pthread_cond_init(&(q->cond_all_done), NULL);
 }
 
 void queueDestroy(queue_t *q) {
-    for (int i = 0; i < q->max; i++) {
-        if(q->buf[i] != NULL) {
-            free(q->buf[i]);
-        }
+    while (q->front != NULL){
+        request_t* tmp = q->front;
+        dropRequest(tmp);//also frees tmp
+        q->front = q->front->next_request;
     }
-    free(q->buf);
     pthread_mutex_destroy(&(q->mutex));
     pthread_cond_destroy(&(q->cond_full));
     pthread_cond_destroy(&(q->cond_empty));
+    pthread_cond_destroy(&(q->cond_all_done));
 }
+
+
+void insertAtBack(queue_t *q, request_t* new_request){
+    if(q->back == NULL){
+        q->front = new_request;
+        q->back = new_request;
+    }
+    else{
+        new_request->next_request = q->back;
+        q->back = new_request;
+    }
+    //q->size++;
+    q->waiting_requests++;
+}
+
+void dropRequest(request_t* request){
+    if(request != NULL){
+        //TODO -- close socket!
+        Close(request->fd);
+        free(request);
+    }
+    return;
+}
+
+void removeFront(queue_t *q){
+    request_t* last_front = q->front;
+    if(last_front == NULL){
+        return;
+    }
+
+    if (q->front == q->back){
+        q->front = NULL;
+        q->back = NULL;
+    }
+    else{
+        request_t* it = q->back;
+        while(it->next_request != q->front){
+            it = it->next_request;
+        }
+        q->front = it;
+        it->next_request = NULL;
+    }
+    //dropRequest(last_front);
+}
+
+
 //TODO -- implement a different queue function for each of the algorithms: block, drop_tail , etc
-void enqueue(queue_t *q, request* item) {
+void enqueueBlock(queue_t *q, request_t* new_request) {
     pthread_mutex_lock(&(q->mutex));
-    while (q->waiting_requests + q->running_requests == q->max) {
+    while (q->waiting_requests + q->running_requests == q->max_size) {
         pthread_cond_wait(&(q->cond_full), &(q->mutex));
     }
-    q->buf[q->rear] = item;
-    q->rear = (q->rear + 1) % q->max;
-    q->waiting_requests++;
+
+    insertAtBack(q, new_request);
+
     pthread_cond_signal(&(q->cond_empty));
     pthread_mutex_unlock(&(q->mutex));
 }
 
-request* dequeue(queue_t *q) {
+
+void enqueueDropTail(queue_t *q, request_t* new_request) {
     pthread_mutex_lock(&(q->mutex));
-    while (q->waiting_requests + q->running_requests == 0) {
+    if(q->waiting_requests + q->running_requests == q->max_size){
+        return;
+    }
+    insertAtBack(q, new_request);
+    pthread_cond_signal(&(q->cond_empty));
+    pthread_mutex_unlock(&(q->mutex));
+}
+
+void enqueueDropHead(queue_t *q, request_t* new_request) {
+    pthread_mutex_lock(&(q->mutex));
+    if(q->waiting_requests + q->running_requests == q->max_size && q->waiting_requests > 0){
+        request_t * oldest_request = q->front;
+        removeFront(q);
+        dropRequest(oldest_request);
+    }
+    insertAtBack(q, new_request);
+    pthread_cond_signal(&(q->cond_empty));
+    pthread_mutex_unlock(&(q->mutex));
+}
+
+void enqueueBlockFlush(queue_t *q, request_t* new_request){
+    pthread_mutex_lock(&(q->mutex));
+    while (q->waiting_requests + q->running_requests != 0) {//TODO -- does this cause mutual exclosion ???
+        pthread_cond_wait(&(q->cond_all_done), &(q->mutex));
+    }
+    //TODO -- do i need to add the new request to the queue? or discard it?
+    dropRequest(new_request);
+    //pthread_cond_signal(&(q->cond_empty));
+    pthread_mutex_unlock(&(q->mutex));
+}
+
+void enqueueDropRandom(queue_t *q, request_t *new_request){
+    pthread_mutex_lock(&(q->mutex));
+    if(q->waiting_requests + q->running_requests == q->max_size && q->waiting_requests > 0){
+        //remove randomly half of elements in waiting queue
+        int half_initial_size = (int) ((q->waiting_requests) / 2);
+        half_initial_size = half_initial_size > 0 ? half_initial_size : 1;
+
+        for( int i = 0 ; i < half_initial_size; i++) {
+            int random_index = rand() % q->waiting_requests;
+            removeAtIndex(q, random_index);
+            q->waiting_requests--;
+        }
+    }
+
+    insertAtBack(q, new_request);
+    pthread_cond_signal(&(q->cond_empty));
+    pthread_mutex_unlock(&(q->mutex));
+}
+
+void removeAtIndex(queue_t* q, int index){
+    if(q->front == q->back){
+        q->back = NULL;
+        q->front = NULL;
+        return;
+    }
+    if(index == 0){
+        request_t* tmp = q->back;
+        q->back = q->back->next_request;
+        dropRequest(tmp);//also frees
+        return;
+    }
+
+    request_t * current = q->back->next_request;//this will hold the element to remove
+    request_t * before = q->back;
+    int i  = index-1;
+    while(i != 0){
+        before = current;
+        current = current->next_request;
+        i--;
+    }
+
+    before->next_request = current->next_request;
+
+    if(current == q->front){
+        q->front = before;
+    }
+    dropRequest(current);
+    return;
+}
+
+
+//enum sched_alg_type {block, dt, dh, bf, rnd};
+void enqueueAccordingToAlgorithm(queue_t* q, request_t *new_request, enum sched_alg_type sched_alg){
+    switch (sched_alg) {
+        case block:
+            enqueueBlock(q, new_request);
+            return;
+
+        case dt:
+            enqueueDropTail(q, new_request);
+            return;
+
+        case dh:
+            enqueueDropHead(q, new_request);
+            return;
+
+        case bf:
+            enqueueBlockFlush(q, new_request);
+            return;
+
+        case rnd:
+            enqueueDropRandom(q, new_request);
+            return;
+
+        default:
+            printf("No congestion algorithm fitted! this should'nt happen!");
+            enqueueBlock(q, new_request);
+            return;
+    }
+}
+
+
+
+
+
+request_t* dequeue(queue_t *q) {
+    pthread_mutex_lock(&(q->mutex));
+    while (q->waiting_requests  == 0) {
         pthread_cond_wait(&(q->cond_empty), &(q->mutex));
     }
-    request *item = q->buf[q->front];
-    q->buf[q->front] = NULL;
-    q->front = (q->front + 1) % q->max;
+    request_t* request = q->front;
+    removeFront(q);
+
     q->waiting_requests--;
     q->running_requests++;
     //pthread_cond_signal(&(q->cond_full)); TODO - ensure this is safe (no race condition, deadlock...)!!!!!!!!!
     pthread_mutex_unlock(&(q->mutex));
-    return item;
+    return request;
 }
 
-void decrementRunningRequests(queue_t *q) {
+
+void UpdateQueueAfterFinishingRequest(queue_t* q){
     pthread_mutex_lock(&(q->mutex));
+
     q->running_requests--;
     pthread_cond_signal(&(q->cond_full));
+    if(q->running_requests+q->waiting_requests == 0){
+        pthread_cond_signal(&(q->cond_all_done));
+    }
+
     pthread_mutex_unlock(&(q->mutex));
 }
 
 
-
+/******************OLD IMPLEMENTATION********************************/
+//void queueInit(queue_t *q, int n) {
+//    q->buf = (request **)malloc(sizeof(request*) * n);
+//    q->max = n;
+//    q->front = 0;
+//    q->rear = 0;
+//    q->waiting_requests = 0;
+//    q->running_requests = 0;
+//    pthread_mutex_init(&(q->mutex), NULL);
+//    pthread_cond_init(&(q->cond_full), NULL);
+//    pthread_cond_init(&(q->cond_empty), NULL);
+//}
+//
+//void queueDestroy(queue_t *q) {
+//    for (int i = 0; i < q->max; i++) {
+//        if(q->buf[i] != NULL) {
+//            free(q->buf[i]);
+//        }
+//    }
+//    free(q->buf);
+//    pthread_mutex_destroy(&(q->mutex));
+//    pthread_cond_destroy(&(q->cond_full));
+//    pthread_cond_destroy(&(q->cond_empty));
+//}
+////TODO -- implement a different queue function for each of the algorithms: block, drop_tail , etc
+//void enqueue_block(queue_t *q, request* item) {
+//    pthread_mutex_lock(&(q->mutex));
+//    while (q->waiting_requests + q->running_requests == q->max) {
+//        pthread_cond_wait(&(q->cond_full), &(q->mutex));
+//    }
+//    q->buf[q->rear] = item;
+//    q->rear = (q->rear + 1) % q->max;
+//    q->waiting_requests++;
+//    pthread_cond_signal(&(q->cond_empty));
+//    pthread_mutex_unlock(&(q->mutex));
+//}
+//void enqueue_drop_tail(queue_t *q, request* item) {
+//    pthread_mutex_lock(&(q->mutex));
+//    if(q->waiting_requests + q->running_requests == q->max){
+//        return;
+//    }
+//    q->buf[q->rear] = item;
+//    q->rear = (q->rear + 1) % q->max;
+//    q->waiting_requests++;
+//    pthread_cond_signal(&(q->cond_empty));
+//    pthread_mutex_unlock(&(q->mutex));
+//}
+//
+//void enqueue_drop_head(queue_t *q, request* item) {
+//    pthread_mutex_lock(&(q->mutex));
+//    if(q->waiting_requests + q->running_requests == q->max){//suppose to be in the case where rear==front
+//        q->buf[q->front] = NULL;
+//        q->front = (q->front + 1) % q->max;
+//        q->waiting_requests--;
+//    }
+//    q->buf[q->rear] = item;
+//    q->rear = (q->rear + 1) % q->max;
+//    q->waiting_requests++;
+//    pthread_cond_signal(&(q->cond_empty));
+//    pthread_mutex_unlock(&(q->mutex));
+//}
+//
+//void enqueue_block_flush(queue_t *q, request *item){
+//    pthread_mutex_lock(&(q->mutex));
+//    while (q->waiting_requests + q->running_requests == 0) {//TODO -- does this cause mutual exclosion ???
+//        pthread_cond_wait(&(q->cond_full), &(q->mutex));
+//    }
+//    //TODO -- do i need to add the new request to the queue? or discard it?
+//    q->buf[q->rear] = item;
+//    q->rear = (q->rear + 1) % q->max;
+//    q->waiting_requests++;
+//    pthread_cond_signal(&(q->cond_empty));
+//    pthread_mutex_unlock(&(q->mutex));
+//}
+//
+//
+//request* dequeue(queue_t *q) {
+//    pthread_mutex_lock(&(q->mutex));
+//    while (q->waiting_requests + q->running_requests == 0) {
+//        pthread_cond_wait(&(q->cond_empty), &(q->mutex));
+//    }
+//    request *item = q->buf[q->front];
+//    q->buf[q->front] = NULL;
+//    q->front = (q->front + 1) % q->max;
+//    q->waiting_requests--;
+//    q->running_requests++;
+//    //pthread_cond_signal(&(q->cond_full)); TODO - ensure this is safe (no race condition, deadlock...)!!!!!!!!!
+//    pthread_mutex_unlock(&(q->mutex));
+//    return item;
+//}
+//
+//void decrementRunningRequests(queue_t *q) {
+//    pthread_mutex_lock(&(q->mutex));
+//    q->running_requests--;
+//    pthread_cond_signal(&(q->cond_full));
+//    pthread_mutex_unlock(&(q->mutex));
+//}
 
