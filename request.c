@@ -107,7 +107,6 @@ void requestGetFiletype(char *filename, char *filetype)
         strcpy(filetype, "image/gif");
     else if (strstr(filename, ".jpg"))
         strcpy(filetype, "image/jpeg");
-    //TODO - add SKIP??????!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     else
         strcpy(filetype, "text/plain");
 }
@@ -188,7 +187,7 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 // handle a request
 void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
-    t_stats->total_req++;
+    t_stats->total_req++; //increment total requests when any request is (including errors)
     int is_static;
     struct stat sbuf;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
@@ -206,6 +205,14 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
     requestReadhdrs(&rio);
+
+    //check for skip and change uri accordingly
+    char *suffix_position = strstr(uri, ".skip");
+    if (suffix_position != NULL) {  //if special suffix is found
+        t_stats->next_req = dequeueLatest(t_stats->wait_q);
+        *suffix_position = '\0'; //remove the ".skip" suffix from the uri
+    } //TODO - is this okay to replace '.skip' with '\0' to uri?? it effectively ends the string- uri must end with ".skip" (not just the filename inside uri) and from chatgpt that's the case
+    //continue handling request
 
     is_static = requestParseURI(uri, filename, cgiargs);
     if (stat(filename, &sbuf) < 0) {
@@ -234,207 +241,100 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 
 
 
+//-----------------------------------------------------------------------
+//QUEUE FUNCTIONS
+//-----------------------------------------------------------------------
 
+queue_t* queueInit(int n) {
+    queue_t* q = (queue_t*)malloc(sizeof(queue_t));
+    q->buf = (request **)malloc(sizeof(request*) * n);
+    q->max = n;
+    q->front = 0;
+    q->rear = 0;
+    q->waiting_requests = 0;
+    q->running_requests = 0;
+    pthread_mutex_init(&(q->mutex), NULL);
+    pthread_cond_init(&(q->cond_full), NULL);
+    pthread_cond_init(&(q->cond_empty), NULL);
+    return q;
+}
 
+void queueDestroy(queue_t *q) {
+    for (int i = 0; i < q->max; i++) {
+        if(q->buf[i] != NULL) {
+            free(q->buf[i]);
+        }
+    }
+    free(q->buf);
+    pthread_mutex_destroy(&(q->mutex));
+    pthread_cond_destroy(&(q->cond_full));
+    pthread_cond_destroy(&(q->cond_empty));
+    free(q);
+}
+//TODO -- implement a different queue function for each of the algorithms: block, drop_tail , etc
+void enqueue(queue_t *q, request* item) {
+    pthread_mutex_lock(&(q->mutex));
+    while (q->waiting_requests + q->running_requests == q->max) {
+        pthread_cond_wait(&(q->cond_full), &(q->mutex));
+    }
+    q->buf[q->rear] = item;
+    q->rear = (q->rear + 1) % q->max;
+    q->waiting_requests++;
+    pthread_cond_signal(&(q->cond_empty));
+    pthread_mutex_unlock(&(q->mutex));
+}
 
+request* dequeue(queue_t *q) { //TODO - make sure valid when there is one request left - can front be less than rear? is it okay?!!!!
+    pthread_mutex_lock(&(q->mutex));
+    while (q->waiting_requests + q->running_requests == 0) {
+        pthread_cond_wait(&(q->cond_empty), &(q->mutex));
+    }
+    request *item = q->buf[q->front];
+    q->buf[q->front] = NULL;
+    assert(item != NULL);
+    gettimeofday(&(item->dispatch_time), NULL);
+    q->front = (q->front + 1) % q->max;
+    q->waiting_requests--;
+    q->running_requests++;
+    //pthread_cond_signal(&(q->cond_full)); TODO - ensure this is safe (no race condition, deadlock...)!!!!!!!!!
+    pthread_mutex_unlock(&(q->mutex));
+    return item;
+}
 
+void decrementRunningRequests(queue_t *q) {
+    pthread_mutex_lock(&(q->mutex));
+    q->running_requests--;
+    pthread_cond_signal(&(q->cond_full));
+    pthread_mutex_unlock(&(q->mutex));
+}
 
-
-
-
-
-
-
-
-//TODO - old version (not example):
-/*
-// requestError(      fd,    filename,        "404",    "Not found", "OS-HW3 Server could not find this file");
-void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg) 
-{
-   char buf[MAXLINE], body[MAXBUF];
-
-   // Create the body of the error message
-   sprintf(body, "<html><title>OS-HW3 Error</title>");
-   sprintf(body, "%s<body bgcolor=""fffff"">\r\n", body);
-   sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
-   sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
-   sprintf(body, "%s<hr>OS-HW3 Web Server\r\n", body);
-
-   // Write out the header information for this response
-   sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
-   Rio_writen(fd, buf, strlen(buf));
-   printf("%s", buf);
-
-   sprintf(buf, "Content-Type: text/html\r\n");
-   Rio_writen(fd, buf, strlen(buf));
-   printf("%s", buf);
-
-   sprintf(buf, "Content-Length: %lu\r\n\r\n", strlen(body));
-   Rio_writen(fd, buf, strlen(buf));
-   printf("%s", buf);
-
-   // Write out the content
-   Rio_writen(fd, body, strlen(body));
-   printf("%s", body);
-
+//dequeue latest request (performed when request filename suffix is .skip)
+request* dequeueLatest(queue_t *q) {
+    pthread_mutex_lock(&(q->mutex));
+    while (q->waiting_requests == 0) {
+        return NULL; //TODO - if during skip the queue is empty then "ignore the skip action and move on" (piazza 435) - does it mean to return NULL here???
+        //pthread_cond_wait(&(q->cond_empty), &(q->mutex));
+    }
+    request *item = q->buf[q->rear];
+    q->buf[q->rear] = NULL;
+    assert(item != NULL);
+    gettimeofday(&item->dispatch_time, NULL);
+    q->rear = (q->rear - 1) % q->max;
+    q->waiting_requests--;
+    q->running_requests++;
+    //pthread_cond_signal(&(q->cond_full)); TODO - ensure this is safe (no race condition, deadlock...)!!!!!!!!!
+    pthread_mutex_unlock(&(q->mutex));
+    return item;
 }
 
 
-//
-// Reads and discards everything up to an empty text line
-//
-void requestReadhdrs(rio_t *rp)
-{
-   char buf[MAXLINE];
-
-   Rio_readlineb(rp, buf, MAXLINE);
-   while (strcmp(buf, "\r\n")) {
-      Rio_readlineb(rp, buf, MAXLINE);
-   }
-   return;
+request* createRequest(int fd) {
+    request* new_request = (request*)malloc(sizeof(request));
+    if (new_request == NULL) {
+        fprintf(stderr, "malloc request failed");
+        exit(1);
+    }
+    new_request->fd = fd;
+    gettimeofday(&new_request->arrival_time, NULL); // Record arrival time
+    return new_request;
 }
-
-//
-// Return 1 if static, 0 if dynamic content
-// Calculates filename (and cgiargs, for dynamic) from uri
-//
-int requestParseURI(char *uri, char *filename, char *cgiargs) 
-{
-   char *ptr;
-
-   if (strstr(uri, "..")) {
-      sprintf(filename, "./public/home.html");
-      return 1;
-   }
-
-   if (!strstr(uri, "cgi")) {
-      // static
-      strcpy(cgiargs, "");
-      sprintf(filename, "./public/%s", uri);
-      if (uri[strlen(uri)-1] == '/') {
-         strcat(filename, "home.html");
-      }
-      return 1;
-   } else {
-      // dynamic
-      ptr = index(uri, '?');
-      if (ptr) {
-         strcpy(cgiargs, ptr+1);
-         *ptr = '\0';
-      } else {
-         strcpy(cgiargs, "");
-      }
-      sprintf(filename, "./public/%s", uri);
-      return 0;
-   }
-}
-
-//
-// Fills in the filetype given the filename
-//
-void requestGetFiletype(char *filename, char *filetype)
-{
-   if (strstr(filename, ".html")) 
-      strcpy(filetype, "text/html");
-   else if (strstr(filename, ".gif")) 
-      strcpy(filetype, "image/gif");
-   else if (strstr(filename, ".jpg")) 
-      strcpy(filetype, "image/jpeg");
-   else 
-      strcpy(filetype, "text/plain");
-}
-
-void requestServeDynamic(int fd, char *filename, char *cgiargs)
-{
-   char buf[MAXLINE], *emptylist[] = {NULL};
-
-   // The server does only a little bit of the header.  
-   // The CGI script has to finish writing out the header.
-   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-   sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
-
-   Rio_writen(fd, buf, strlen(buf));
-   int pid = 0;
-   if ((pid = Fork()) == 0) {
-      // Child process
-      Setenv("QUERY_STRING", cgiargs, 1);
-      // When the CGI process writes to stdout, it will instead go to the socket
-      Dup2(fd, STDOUT_FILENO);
-      Execve(filename, emptylist, environ);
-   }
-   WaitPid(pid, NULL, WUNTRACED);
-}
-
-
-void requestServeStatic(int fd, char *filename, int filesize) 
-{
-   int srcfd;
-   char *srcp, filetype[MAXLINE], buf[MAXBUF];
-
-   requestGetFiletype(filename, filetype);
-
-   srcfd = Open(filename, O_RDONLY, 0);
-
-   // Rather than call read() to read the file into memory, 
-   // which would require that we allocate a buffer, we memory-map the file
-   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
-   Close(srcfd);
-
-   // put together response
-   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-   sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
-   sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
-   sprintf(buf, "%sContent-Type: %s\r\n\r\n", buf, filetype);
-
-   Rio_writen(fd, buf, strlen(buf));
-
-   //  Writes out to the client socket the memory-mapped file 
-   Rio_writen(fd, srcp, filesize);
-   Munmap(srcp, filesize);
-
-}
-
-// handle a request
-void requestHandle(int fd)
-{
-
-   int is_static;
-   struct stat sbuf;
-   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-   char filename[MAXLINE], cgiargs[MAXLINE];
-   rio_t rio;
-
-   Rio_readinitb(&rio, fd);
-   Rio_readlineb(&rio, buf, MAXLINE);
-   sscanf(buf, "%s %s %s", method, uri, version);
-
-   printf("%s %s %s\n", method, uri, version);
-
-   if (strcasecmp(method, "GET")) {
-      requestError(fd, method, "501", "Not Implemented", "OS-HW3 Server does not implement this method");
-      return;
-   }
-   requestReadhdrs(&rio);
-
-   is_static = requestParseURI(uri, filename, cgiargs);
-   if (stat(filename, &sbuf) < 0) {
-      requestError(fd, filename, "404", "Not found", "OS-HW3 Server could not find this file");
-      return;
-   }
-
-   if (is_static) {
-      if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
-         requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not read this file");
-         return;
-      }
-      requestServeStatic(fd, filename, sbuf.st_size);
-   } else {
-      if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-         requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not run this CGI program");
-         return;
-      }
-      requestServeDynamic(fd, filename, cgiargs);
-   }
-}
-*/
-

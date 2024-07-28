@@ -1,7 +1,8 @@
 #include "segel.h"
 #include "request.h"
-#include "queue.h"
-#include "worker.h"
+//#include "queue.h"
+//#include "worker.h"
+#include "assert.h" //TODO - remove this before submission!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 // 
 // server.c: A very, very simple web server
@@ -14,7 +15,7 @@
 //
 
 enum sched_alg_type {block, dt, dh, bf, rnd};
-
+void* worker_thread(void* arg);
 
 // HW3: Parse the new arguments too
 //./server [portnum] [threads] [queue_size] [sched_alg]
@@ -56,18 +57,23 @@ int main(int argc, char *argv[])
 
     pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * num_threads);
     if(threads == NULL){
+        fprintf(stderr, "malloc threads failed");
         exit(1);
-        //TODO -what to do if malloc fails?
+        //TODO - if malloc fails then (piazza) print error message and exit
     }
 
     queue_t* wait_q = queueInit(queue_size);
 
     // HW3: Create some threads...
-    arg_array args; //pass arguments to thread, arg_array is defined in worker.h
-    args.queue_ptr = wait_q;
-    for (int i = 0; i < num_threads; i++) {
-        args.index = i;
-        pthread_create(&threads[i], NULL, worker_thread, &args);
+    for (int i = 1; i <= num_threads; i++) {
+        threads_stats t_stats = (threads_stats) malloc(sizeof(struct Threads_stats));
+        if(threads == NULL){
+            fprintf(stderr, "malloc threads_stats failed");
+            exit(1);
+        }
+        t_stats->id = i;
+        t_stats->wait_q = wait_q;
+        pthread_create(&threads[i], NULL, worker_thread, (void*)t_stats);
     }
 
     listenfd = Open_listenfd(port); //error - bind failed 7/20/2024 14:46, server ran without client might be reason, simply for checking validity
@@ -75,6 +81,7 @@ int main(int argc, char *argv[])
 	    clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
         request* new_request = createRequest(connfd);  //request is defined in queue.h
+        gettimeofday(&(new_request->arrival_time), NULL); // Record arrival time
         enqueue(wait_q, new_request);
 
         // HW3: In general, don't handle the request in the main thread.
@@ -94,58 +101,42 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-/*
-void* worker_routine(void* arg) {
-    thread_stats stats;
-    queue_t * wait_q = (queue_t*) arg;
 
+//--------------------------------------------------------------------
+//WORKER THREADS
+//--------------------------------------------------------------------
+
+void* worker_thread(void* arg) {
+    //init thread stats
+    threads_stats t_stats = (threads_stats) arg;
+    t_stats->stat_req = 0;
+    t_stats->dynm_req = 0;
+    t_stats->total_req = 0;
+    t_stats->next_req = NULL; //for special suffix policy
+
+    //thread routine:
     while (1) {
-        request* req = dequeue(wait_q);
+        request* req = NULL;
+        //check if skipping:
+        if (t_stats->next_req == NULL) {
+            req = dequeue(t_stats->wait_q);
+        }
+        else {
+            req = t_stats->next_req;
+            t_stats->next_req = NULL; //reset before next iteration!, freed when req is freed
+        }
         assert(req != NULL);
-        if (req == NULL) {
-            continue; // No request to process
-        }
 
-        gettimeofday(&req->dispatch_time, NULL); // Record dispatch time
+        struct timeval dispatch_interval;
+        timersub(&req->dispatch_time, &req->arrival_time, &dispatch_interval); // Calculate dispatch interval (according to chatgpt)
 
-        long dispatch_interval = (req->dispatch_time.tv_sec - req->arrival_time.tv_sec) * 1000 +
-                                 (req->dispatch_time.tv_usec - req->arrival_time.tv_usec) / 1000;
-
-         TODO - Update thread statistics
-        if (is_static_request(req)) {
-            stats->static_count++;
-        } else {
-            stats->dynamic_count++;
-        }
-
-
-        // Process the request
-        requestHandle(req->fd);
-        //TODO - ^MAYBE CHANGE RETURN VALUE OF HANDLE TO BE IS_STATIC (updated by requestParseURI in request.c) TO UPDATE STATS!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-        // Embed statistics in the response headers
-        char headers[1024];
-        snprintf(headers, sizeof(headers),
-                 "Stat-Req-Arrival: %ld.%06ld\r\n"
-                 "Stat-Req-Dispatch: %ld\r\n"
-                 "Stat-Thread-Id: %d\r\n"
-                 "Stat-Thread-Count: %d\r\n"
-                 "Stat-Thread-Static: %d\r\n"
-                 "Stat-Thread-Dynamic: %d\r\n",
-                 req->arrival_time.tv_sec, req->arrival_time.tv_usec,
-                 dispatch_interval,
-                 stats->id,
-                 (stats->static_count + stats->dynamic_count),
-                 stats->static_count,
-                 stats->dynamic_count);
-
-        //send_response(req->fd, headers); // Function to send response with headers
+        // Process the request, thread stats are updated in requestHandle through the t_stats ptr, response will be embedded in fd
+        requestHandle(req->fd, req->arrival_time, dispatch_interval, t_stats); //TODO - change dispatch time to dispatch interval (long or struct timeval???) !!!!!!!!
 
         // Discard the request
-        //TODO - lower num of running requests in queue
         Close(req->fd);
         free(req);
+        decrementRunningRequests(t_stats->wait_q);
     }
+    free(t_stats);
 }
-*/

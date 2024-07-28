@@ -22,11 +22,6 @@ typedef struct Thread_stats {
 } *thread_stats;
  */
 
-//struct to pass arguments to thread
-typedef struct {
-    queue_t* queue_ptr;
-    int index;
-} arg_array;
 
 //check special suffix
 int checkSkipSuffix(int fd) {//TODO - implement this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -38,35 +33,31 @@ void removeSkipSuffix(int fd) {//TODO - implement this!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void* worker_thread(void* arg) {
     //init thread stats
-    threads_stats t_stats = (threads_stats) malloc(sizeof(struct Threads_stats));
+    threads_stats t_stats = (threads_stats*) arg;
     t_stats->stat_req = 0;
     t_stats->dynm_req = 0;
     t_stats->total_req = 0;
-    arg_array *args = (arg_array*) arg;
-    t_stats->id = args->index;
+    t_stats->next_req = NULL; //for special suffix policy
 
-    queue_t *wait_q = args->queue_ptr;
-    //queue_t *wait_q = (queue_t*) arg;
-
-    request* next_req = NULL; //for special suffix policy
     //thread routine:
     while (1) {
         request* req = NULL;
         //check if skipping:
-        if (next_req == NULL) {
-            req = dequeue(wait_q);
+        if (t_stats->next_req == NULL) {
+            req = dequeue(t_stats->wait_q);
         }
         else {
-            req = next_req;
-            next_req = NULL; //reset before next iteration!, freed when req is freed
+            req = t_stats->next_req;
+            t_stats->next_req = NULL; //reset before next iteration!, freed when req is freed
         }
         assert(req != NULL);
+        /*
         //t_stats->total_req++; //TODO - update total requests here or in requestHandle?? right now in requestHandle
         if (checkSkipSuffix(req->fd)) {
-            next_req = dequeueLatest(wait_q); //first, save the last request
+            t_stats->next_req = dequeueLatest(t_stats->wait_q); //first, save the last request
             removeSkipSuffix(req->fd);
         }
-
+        */
         gettimeofday(&req->dispatch_time, NULL); // Record dispatch time. TODO - maybe do this in dequeue?!!!
 
         long dispatch_interval = (req->dispatch_time.tv_sec - req->arrival_time.tv_sec) * 1000 +
@@ -81,7 +72,7 @@ void* worker_thread(void* arg) {
         // Discard the request
         Close(req->fd);
         free(req);
-        decrementRunningRequests(wait_q);
+        decrementRunningRequests(t_stats->wait_q);
     }
     free(t_stats);
 }

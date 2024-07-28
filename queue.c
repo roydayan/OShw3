@@ -52,6 +52,8 @@ request* dequeue(queue_t *q) { //TODO - make sure valid when there is one reques
     }
     request *item = q->buf[q->front];
     q->buf[q->front] = NULL;
+    assert(item != NULL);
+    gettimeofday(&(item->dispatch_time), NULL);
     q->front = (q->front + 1) % q->max;
     q->waiting_requests--;
     q->running_requests++;
@@ -76,6 +78,8 @@ request* dequeueLatest(queue_t *q) {
     }
     request *item = q->buf[q->rear];
     q->buf[q->rear] = NULL;
+    assert(item != NULL);
+    gettimeofday(&item->dispatch_time, NULL);
     q->rear = (q->rear - 1) % q->max;
     q->waiting_requests--;
     q->running_requests++;

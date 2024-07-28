@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 #include "segel.h"
+#include "assert.h" //TODO - remove this before submission!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 typedef struct {
     int fd; // File descriptor for the client connection
