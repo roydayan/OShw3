@@ -222,7 +222,10 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
             fprintf(stderr, "Error: special suffix found but not found in filename\n");
         }
         else {
-            *suffix_position = '\0'; //remove the ".skip" suffix from the filename
+            //replace .skip with \0's:
+            for (int i = 0; i < 5; i++) {
+                suffix_position[i] = '\0';
+            }
         }
     }
     //continue handling request
