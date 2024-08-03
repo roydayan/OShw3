@@ -17,10 +17,12 @@ void* worker_routine(void* arg) {
         request_t* req = NULL;
         //check if skipping:
         if (t_stats->next_req == NULL) {
-            FILE *file = fopen("test_drop_head_server_out.txt", "a");
-            fprintf(file, "Thread %d is dequeuing a request...\n", t_stats->id);
-            fflush(file);
-            fclose(file);
+
+//            FILE *file = fopen("test_drop_head_server_out.txt", "a");
+//            fprintf(file, "Thread %d is dequeuing a request...\n", t_stats->id);
+//            fflush(file);
+//            fclose(file);
+
             req = dequeue(t_stats->wait_q, t_stats->id);
         }
         else {
@@ -32,10 +34,12 @@ void* worker_routine(void* arg) {
         timersub(&req->dispatch_time, &req->arrival_time, &dispatch_interval); // Calculate dispatch interval (according to chatgpt)
 
         // Process the request, thread stats are updated in requestHandle through the t_stats ptr, response will be embedded in fd
-        FILE *file = fopen("test_drop_head_server_out.txt", "a");
-        fprintf(file, "Thread %d is handeling a request...\n", t_stats->id);
-        fflush(file);
-        fclose(file);
+
+//        FILE *file = fopen("test_drop_head_server_out.txt", "a");
+//        fprintf(file, "Thread %d is handeling a request...\n", t_stats->id);
+//        fflush(file);
+//        fclose(file);
+
         requestHandle(req->fd, req->arrival_time, dispatch_interval, t_stats);
 
         // Discard the request

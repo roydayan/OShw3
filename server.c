@@ -14,15 +14,6 @@
 // Most of the work is done within routines written in request.c
 //
 
-//enum sched_alg_type {block, dt, dh, bf, rnd};
-
-/* declared in worker.h
-typedef struct Threads_Stats{
-    int id;
-    int static_count;
-    int dynamic_count;
-} * thread_stats;
- */
 
 //void* worker_routine(void* arg);
 request_t* createRequest(int fd);
@@ -84,10 +75,10 @@ int main(int argc, char *argv[])
     }
 
     // HW3: Create some threads...
-    FILE *file = fopen("test_drop_head_server_out.txt", "a");
-    fprintf(file, "Server intializing threads...\n");
-    fflush(file);
-    fclose(file);
+    //FILE *file = fopen("test_drop_head_server_out.txt", "a");
+    //fprintf(file, "Server intializing threads...\n");
+    //fflush(file);
+    //fclose(file);
 
     for (int i = 0; i < num_threads; i++) {
         t_stats_array[i] = (threads_stats)malloc(sizeof(struct Threads_stats));
@@ -110,10 +101,14 @@ int main(int argc, char *argv[])
         gettimeofday(&temp_arrival_time, NULL); // Record arrival time
         request_t* new_request = createRequest(connfd);  //request is defined in queue.h
         new_request->arrival_time = temp_arrival_time; //update the arrival time to be exact
-        FILE *file = fopen("test_drop_head_server_out.txt", "a");
-        fprintf(file, "Server enqueues new request...\n");
-        fflush(file);
-        fclose(file);
+
+
+//        FILE *file = fopen("test_drop_head_server_out.txt", "a");
+//        fprintf(file, "Server enqueues new request...\n");
+//        fflush(file);
+//        fclose(file);
+
+
         enqueueAccordingToAlgorithm(wait_q, new_request, sched_alg);
 
         // HW3: In general, don't handle the request in the main thread.
