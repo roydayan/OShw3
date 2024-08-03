@@ -76,9 +76,10 @@ request_t* dequeueLatest(queue_t *q);
 void enqueueAccordingToAlgorithm(queue_t* q, request_t *new_request, enum sched_alg_type sched_alg);
 
 
-request_t* dequeue(queue_t *q);
+request_t* dequeue(queue_t *q, int thread_id);
 void UpdateQueueAfterFinishingRequest(queue_t* q);
 
-
+const char* current_time_str();
+void log_queue_state(queue_t *q, request_t *request, const char *action, int thread_id, int times);
 
 #endif
