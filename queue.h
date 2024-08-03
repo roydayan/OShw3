@@ -71,6 +71,7 @@ void enqueueDropTail(queue_t *q, request_t* new_request);
 void enqueueDropHead(queue_t *q, request_t *new_request);
 void enqueueBlockFlush(queue_t *q, request_t *new_request);
 void enqueueDropRandom(queue_t *q, request_t *new_request);
+request_t* dequeueLatest(queue_t *q);
 
 void enqueueAccordingToAlgorithm(queue_t* q, request_t *new_request, enum sched_alg_type sched_alg);
 
