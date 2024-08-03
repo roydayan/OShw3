@@ -24,8 +24,9 @@
 #include "segel.h"
 
 /*
- * Send an HTTP request for the specified file
+ * Send an HTTP request for the specified file 
  */
+
 void clientSend(int fd, char *filename)
 {
   char buf[MAXLINE];
@@ -38,17 +39,17 @@ void clientSend(int fd, char *filename)
   sprintf(buf, "%shost: %s\n\r\n", buf, hostname);
   Rio_writen(fd, buf, strlen(buf));
 }
-
+  
 /*
  * Read the HTTP response and print it out
  */
 void clientPrint(int fd)
 {
   rio_t rio;
-  char buf[MAXBUF];
+  char buf[MAXBUF];  
   int length = 0;
   int n;
-
+  
   Rio_readinitb(&rio, fd);
 
   /* Read and display the HTTP Header */
@@ -73,78 +74,65 @@ void clientPrint(int fd)
 
 int main(int argc, char *argv[])
 {
-  char *host, *filename;
-  int port;
-  int clientfd;
+    char *host, *filename;
+    int port;
+    int clientfd;
 
-  if (argc != 4) {
-    fprintf(stderr, "Usage: %s <host> <port> <filename>\n", argv[0]);
-    exit(1);
-  }
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <host> <port> <filename>\n", argv[0]);
+        exit(1);
+    }
 
-  host = argv[1];
-  port = atoi(argv[2]);
-  filename = argv[3];
-  pid_t pids[10];
-  pid_t pid;
-  for (int i = 0; i < 10 ; i ++){
-      pid = fork();
-      if(pid > 0 ){
-          pids[i] = pid;
-          break;
-      }
-  }
-  /* Open a single connection to the specified host and port */
-  clientfd = Open_clientfd(host, port);
+    host = argv[1];
+    port = atoi(argv[2]);
+    filename = argv[3];
 
-  clientSend(clientfd, filename);
-  clientPrint(clientfd);
+    /* Open a single connection to the specified host and port */
+    clientfd = Open_clientfd(host, port);
 
-  Close(clientfd);
+    clientSend(clientfd, filename);
+    clientPrint(clientfd);
 
-  if(pid == 0){
-      for (int i = 0 ; i < 10 ; i++){
-          waitpid(pids[i],NULL, 0);
-      }
-  }
-  exit(0);
+    Close(clientfd);
+
+    exit(0);
 }
 
+/*
+char *host, *filename;
+int port;
+int clientfd;
 
-/****************************ORI IMPLEMANTATION*************************************/
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <curl/curl.h>
-//
-//void make_request(const char* hostname, int port, const char* filename) {
-//    CURL *curl;
-//    CURLcode res;
-//    char url[256];
-//
-//    snprintf(url, sizeof(url), "http://%s:%d/%s", hostname, port, filename);
-//
-//    curl = curl_easy_init();
-//    if(curl) {
-//        curl_easy_setopt(curl, CURLOPT_URL, url);
-//        res = curl_easy_perform(curl);
-//        if(res != CURLE_OK)
-//            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-//
-//        curl_easy_cleanup(curl);
-//    }
-//}
-//
-//int main(int argc, char *argv[]) {
-//    if (argc != 4) {
-//        fprintf(stderr, "Usage: %s <hostname> <port> <filename>\n", argv[0]);
-//        return 1;
-//    }
-//
-//    const char* hostname = argv[1];
-//    int port = atoi(argv[2]);
-//    const char* filename = argv[3];
-//
-//    make_request(hostname, port, filename);
-//
-//    return 0;
-//}
+if (argc != 4) {
+ fprintf(stderr, "Usage: %s <host> <port> <filename>\n", argv[0]);
+ exit(1);
+}
+
+host = argv[1];
+port = atoi(argv[2]);
+filename = argv[3];
+pid_t pids[10];
+pid_t pid;
+for (int i = 0; i < 10 ; i ++){
+   pid = fork();
+   if(pid > 0 ){
+       pids[i] = pid;
+       break;
+   }
+}
+// Open a single connection to the specified host and port
+clientfd = Open_clientfd(host, port);
+
+clientSend(clientfd, filename);
+clientPrint(clientfd);
+
+Close(clientfd);
+
+if(pid == 0){
+   for (int i = 0 ; i < 10 ; i++){
+       waitpid(pids[i],NULL, 0);
+   }
+}
+exit(0);
+}
+*/
