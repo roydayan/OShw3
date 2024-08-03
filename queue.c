@@ -111,23 +111,23 @@ void enqueueDropHead(queue_t *q, request_t* new_request) {
     if(q->waiting_requests + q->running_requests == q->max_size){
         if(q->waiting_requests > 0){
             request_t * oldest_request = q->front;
-            log_queue_state(q, new_request, "Before DropHead", -1, times);
+            //log_queue_state(q, new_request, "Before DropHead", -1, times);
             removeFront(q);
             q->waiting_requests--;
-            log_queue_state(q, new_request, "After DropHead", -1, times);
+            //log_queue_state(q, new_request, "After DropHead", -1, times);
             dropRequest(oldest_request);
         }
         else{//TODO-- according to piazza this case wont be tested...
-            log_queue_state(q, new_request, "DropHead when queue is empty", -1, times);
+            //log_queue_state(q, new_request, "DropHead when queue is empty", -1, times);
             dropRequest(new_request);
             pthread_mutex_unlock(&(q->mutex));
             return;
         }
 
     }
-    log_queue_state(q, new_request, "Before Enqueue", -1, times);
+    //log_queue_state(q, new_request, "Before Enqueue", -1, times);
     insertAtBack(q, new_request);
-    log_queue_state(q, new_request, "After Enqueue", -1, times);
+    //log_queue_state(q, new_request, "After Enqueue", -1, times);
     times++;
     pthread_cond_signal(&(q->cond_empty));
     pthread_mutex_unlock(&(q->mutex));
@@ -148,7 +148,7 @@ void enqueueDropRandom(queue_t *q, request_t *new_request){
     pthread_mutex_lock(&(q->mutex));
     if(q->waiting_requests + q->running_requests == q->max_size){
         if(q->waiting_requests == 0){//TODO-- according to piazza this shouldn't happen
-            log_queue_state(q, new_request, "Before DropRandom empty queue" , -1, -1);
+            //log_queue_state(q, new_request, "Before DropRandom empty queue" , -1, -1);
             dropRequest(new_request);
             pthread_mutex_unlock(&(q->mutex));
             return;
@@ -162,7 +162,7 @@ void enqueueDropRandom(queue_t *q, request_t *new_request){
             half_initial_size = (int) ((q->waiting_requests+1) / 2);
         }
         half_initial_size = half_initial_size > 0 ? half_initial_size : 1;
-        log_queue_state(q, new_request, "Before DropRandom", -1, -1);
+        //log_queue_state(q, new_request, "Before DropRandom", -1, -1);
         for( int i = 0 ; i < half_initial_size; i++) {
             if(q->waiting_requests == 0){
                 break;
@@ -171,15 +171,15 @@ void enqueueDropRandom(queue_t *q, request_t *new_request){
             removeAtIndex(q, random_index);
             q->waiting_requests--;
         }
-        log_queue_state(q, new_request, "After DropRandom", -1, -1);
+        //log_queue_state(q, new_request, "After DropRandom", -1, -1);
     }
-    log_queue_state(q, new_request, "Before enqueuing", -1, -1);
+    //log_queue_state(q, new_request, "Before enqueuing", -1, -1);
     insertAtBack(q, new_request);
-    log_queue_state(q, new_request, "After enqueuing", -1, -1);
-    FILE *file = fopen("test_drop_head_server_out.txt", "a");
-    fprintf(file, "main thread is signaling...\n");
-    fflush(file);
-    fclose(file);
+    //log_queue_state(q, new_request, "After enqueuing", -1, -1);
+    //FILE *file = fopen("test_drop_head_server_out.txt", "a");
+    //fprintf(file, "main thread is signaling...\n");
+    //fflush(file);
+    //fclose(file);
 
 
     pthread_cond_signal(&(q->cond_empty));
@@ -265,7 +265,7 @@ void enqueueAccordingToAlgorithm(queue_t* q, request_t *new_request, enum sched_
             return;
 
         default:
-            printf("No congestion algorithm fitted! this should'nt happen!");
+            //printf("No congestion algorithm fitted! this should'nt happen!");
             enqueueBlock(q, new_request);
             return;
     }
@@ -280,27 +280,27 @@ request_t* dequeue(queue_t *q, int thread_id) {
     static int times = 0;
     while (q->waiting_requests  == 0) {
 
-        FILE *file = fopen("test_drop_head_server_out.txt", "a");
-        fprintf(file, "Thread %d is waiting...\n", thread_id);
-        fflush(file);
-        fclose(file);
+        //FILE *file = fopen("test_drop_head_server_out.txt", "a");
+        //fprintf(file, "Thread %d is waiting...\n", thread_id);
+        //fflush(file);
+        //fclose(file);
 
         pthread_cond_wait(&(q->cond_empty), &(q->mutex));
 
-        file = fopen("test_drop_head_server_out.txt", "a");
-        fprintf(file, "Thread %d has finished waiting...\n", thread_id);
-        fflush(file);
-        fclose(file);
+        //file = fopen("test_drop_head_server_out.txt", "a");
+        //fprintf(file, "Thread %d has finished waiting...\n", thread_id);
+        //fflush(file);
+        //fclose(file);
 
     }
     request_t* request = q->front;
-    log_queue_state(q, request, "Before Dequeue", thread_id, times);
+    //log_queue_state(q, request, "Before Dequeue", thread_id, times);
     removeFront(q);
     gettimeofday(&request->dispatch_time, NULL);
     q->waiting_requests--;
     q->running_requests++;
     //pthread_cond_signal(&(q->cond_full)); TODO - ensure this is safe (no race condition, deadlock...)!!!!!!!!!
-    log_queue_state(q, request, "After Dequeue", thread_id, times);
+    //log_queue_state(q, request, "After Dequeue", thread_id, times);
     times++;
     pthread_mutex_unlock(&(q->mutex));
     return request;
