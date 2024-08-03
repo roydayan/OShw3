@@ -113,13 +113,19 @@ int main(int argc, char *argv[])
         // Save the relevant info in a buffer and have one of the worker threads
         // do the work.
         //requestHandle(connfd); --in the thread
-        //Close(connfd); --in the thread
-
+        /*
+        if (!isEnqueued) {
+            Close(connfd);
+            free(new_request);
+        }
+         */
+        /*
         if (connfd < 0) { //TODO - get rid of this. I wrote this so that code after while is reachable
             fprintf(stderr, "connfd < 0, accept failed");
             continue;
             //TODO -when to exit while????????????????????????????????????????????
         }
+         */
     }
     /*
     for (int i = 0; i < num_threads; i++) {
