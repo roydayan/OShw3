@@ -5,53 +5,43 @@
 #include "worker.h"
 
 void* worker_routine(void* arg) {
-    thread_stats stats;
-    queue_t *wait_q = (queue_t*) arg;
+    //init thread stats
+    threads_stats t_stats = (threads_stats) arg;
+    t_stats->stat_req = 0;
+    t_stats->dynm_req = 0;
+    t_stats->total_req = 0;
+    t_stats->next_req = NULL; //for special suffix policy
+
+    //thread routine:
     while (1) {
-        request_t* req = dequeue(wait_q);
-        //assert(req != NULL);
-
-        //gettimeofday(&req->dispatch_time, NULL); // Record dispatch time
-
-//        long dispatch_interval = (req->dispatch_time.tv_sec - req->arrival_time.tv_sec) * 1000 +
-//                                 (req->dispatch_time.tv_usec - req->arrival_time.tv_usec) / 1000;
-
-        /* TODO - Update thread statistics
-        if (is_static_request(req)) {
-            stats->static_count++;
-        } else {
-            stats->dynamic_count++;
+        request_t* req = NULL;
+        //check if skipping:
+        if (t_stats->next_req == NULL) {
+            FILE *file = fopen("test_drop_head_server_out.txt", "a");
+            fprintf(file, "Thread %d is dequeuing a request...\n", t_stats->id);
+            fflush(file);
+            fclose(file);
+            req = dequeue(t_stats->wait_q, t_stats->id);
         }
-        */
+        else {
+            req = t_stats->next_req;
+            t_stats->next_req = NULL; //reset before next iteration!, freed when req is freed
+        }
 
-        // Process the request
-        requestHandle(req->fd);
-        //TODO - ^MAYBE CHANGE RETURN VALUE OF HANDLE TO BE IS_STATIC (updated by requestParseURI in request.c) TO UPDATE STATS!!!!!!!!!!!!!!!!!!!!!!!!!!
+        struct timeval dispatch_interval;
+        timersub(&req->dispatch_time, &req->arrival_time, &dispatch_interval); // Calculate dispatch interval (according to chatgpt)
 
-
-        // Embed statistics in the response headers
-//        char headers[1024];
-//        snprintf(headers, sizeof(headers),
-//                 "Stat-Req-Arrival: %ld.%06ld\r\n"
-//                 "Stat-Req-Dispatch: %ld\r\n"
-//                 "Stat-Thread-Id: %d\r\n"
-//                 "Stat-Thread-Count: %d\r\n"
-//                 "Stat-Thread-Static: %d\r\n"
-//                 "Stat-Thread-Dynamic: %d\r\n",
-//                 req->arrival_time.tv_sec, req->arrival_time.tv_usec,
-//                 dispatch_interval,
-//                 stats->id,
-//                 (stats->static_count + stats->dynamic_count),
-//                 stats->static_count,
-//                 stats->dynamic_count);
-        //TODO - rio_writen???
-
-        //send_response(req->fd, headers); // Function to send response with headers
+        // Process the request, thread stats are updated in requestHandle through the t_stats ptr, response will be embedded in fd
+        FILE *file = fopen("test_drop_head_server_out.txt", "a");
+        fprintf(file, "Thread %d is handeling a request...\n", t_stats->id);
+        fflush(file);
+        fclose(file);
+        requestHandle(req->fd, req->arrival_time, dispatch_interval, t_stats);
 
         // Discard the request
         Close(req->fd);
         free(req);
-        UpdateQueueAfterFinishingRequest(wait_q);//this will update q->running_requests and signal
-
+        UpdateQueueAfterFinishingRequest(t_stats->wait_q);//this will update q->running_requests and signal
     }
+    free(t_stats);
 }

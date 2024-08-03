@@ -24,7 +24,7 @@
 #include "segel.h"
 
 /*
- * Send an HTTP request for the specified file 
+ * Send an HTTP request for the specified file
  */
 void clientSend(int fd, char *filename)
 {
@@ -38,17 +38,17 @@ void clientSend(int fd, char *filename)
   sprintf(buf, "%shost: %s\n\r\n", buf, hostname);
   Rio_writen(fd, buf, strlen(buf));
 }
-  
+
 /*
  * Read the HTTP response and print it out
  */
 void clientPrint(int fd)
 {
   rio_t rio;
-  char buf[MAXBUF];  
+  char buf[MAXBUF];
   int length = 0;
   int n;
-  
+
   Rio_readinitb(&rio, fd);
 
   /* Read and display the HTTP Header */
@@ -96,10 +96,10 @@ int main(int argc, char *argv[])
   }
   /* Open a single connection to the specified host and port */
   clientfd = Open_clientfd(host, port);
-  
+
   clientSend(clientfd, filename);
   clientPrint(clientfd);
-    
+
   Close(clientfd);
 
   if(pid == 0){
@@ -109,3 +109,42 @@ int main(int argc, char *argv[])
   }
   exit(0);
 }
+
+
+/****************************ORI IMPLEMANTATION*************************************/
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <curl/curl.h>
+//
+//void make_request(const char* hostname, int port, const char* filename) {
+//    CURL *curl;
+//    CURLcode res;
+//    char url[256];
+//
+//    snprintf(url, sizeof(url), "http://%s:%d/%s", hostname, port, filename);
+//
+//    curl = curl_easy_init();
+//    if(curl) {
+//        curl_easy_setopt(curl, CURLOPT_URL, url);
+//        res = curl_easy_perform(curl);
+//        if(res != CURLE_OK)
+//            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+//
+//        curl_easy_cleanup(curl);
+//    }
+//}
+//
+//int main(int argc, char *argv[]) {
+//    if (argc != 4) {
+//        fprintf(stderr, "Usage: %s <hostname> <port> <filename>\n", argv[0]);
+//        return 1;
+//    }
+//
+//    const char* hostname = argv[1];
+//    int port = atoi(argv[2]);
+//    const char* filename = argv[3];
+//
+//    make_request(hostname, port, filename);
+//
+//    return 0;
+//}

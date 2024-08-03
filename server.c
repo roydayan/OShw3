@@ -3,6 +3,7 @@
 #include "queue.h"
 #include "worker.h"
 
+
 // 
 // server.c: A very, very simple web server
 //
@@ -68,42 +69,74 @@ int main(int argc, char *argv[])
 
     pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * num_threads);
     if(threads == NULL){
+        fprintf(stderr, "malloc threads failed");
         exit(1);
-        //TODO -what to do if malloc fails?
+        //TODO - if malloc fails then (piazza) print error message and exit
     }
 
     queue_t* wait_q = (queue_t*)malloc(sizeof (queue_t));
     queueInit(wait_q, queue_size);
 
-    // HW3: Create some threads...
-    for (int i = 0; i < num_threads; i++) {
-        //TODO-- what if pthread_create fails??
-        pthread_create(&threads[i], NULL, worker_routine, wait_q);
+    threads_stats* t_stats_array = (threads_stats*) malloc(num_threads*sizeof(struct Threads_stats));
+    if(t_stats_array == NULL){
+        fprintf(stderr, "malloc threads_stats failed");
+        exit(1);
     }
+
+    // HW3: Create some threads...
+    FILE *file = fopen("test_drop_head_server_out.txt", "a");
+    fprintf(file, "Server intializing threads...\n");
+    fflush(file);
+    fclose(file);
+
+    for (int i = 0; i < num_threads; i++) {
+        t_stats_array[i] = (threads_stats)malloc(sizeof(struct Threads_stats));
+        threads_stats t_stats = t_stats_array[i];
+        if(threads == NULL){
+            fprintf(stderr, "malloc threads_stats failed");
+            exit(1);
+        }
+        t_stats->id = i;
+        t_stats->wait_q = wait_q;
+        pthread_create(&threads[i], NULL, worker_routine, (void*)t_stats);
+        //TODO-- what if pthread_create fails??
+    }
+    struct timeval temp_arrival_time; //for immediate time recording
 
     listenfd = Open_listenfd(port);
     while (1) {
 	    clientlen = sizeof(clientaddr);
 	    connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-        request_t* new_request = createRequest(connfd);
+        gettimeofday(&temp_arrival_time, NULL); // Record arrival time
+        request_t* new_request = createRequest(connfd);  //request is defined in queue.h
+        new_request->arrival_time = temp_arrival_time; //update the arrival time to be exact
+        FILE *file = fopen("test_drop_head_server_out.txt", "a");
+        fprintf(file, "Server enqueues new request...\n");
+        fflush(file);
+        fclose(file);
         enqueueAccordingToAlgorithm(wait_q, new_request, sched_alg);
-        //
+
         // HW3: In general, don't handle the request in the main thread.
         // Save the relevant info in a buffer and have one of the worker threads
         // do the work.
-        //
         //requestHandle(connfd); --in the thread
+        //Close(connfd); --in the thread
 
-        //Close(connfd);
-        if (connfd < 0) { //I wrote this so that code after while is reachable
-            break;
+        if (connfd < 0) { //TODO - get rid of this. I wrote this so that code after while is reachable
+            fprintf(stderr, "connfd < 0, accept failed");
+            continue;
             //TODO -when to exit while????????????????????????????????????????????
         }
     }
+    /*
+    for (int i = 0; i < num_threads; i++) {
+        free(t_stats_array[i]);
+    }
+    free(t_stats_array);
     free(threads);
     queueDestroy(wait_q);
-
     return 0;
+     */
 }
 
 request_t* createRequest(int fd) {
@@ -114,62 +147,5 @@ request_t* createRequest(int fd) {
     }
     new_request->fd = fd;
     new_request->next_request =NULL;
-    gettimeofday(&new_request->arrival_time, NULL); // Record arrival time
     return new_request;
 }
-
-/*
-void* worker_routine(void* arg) {
-    thread_stats stats;
-    queue_t * wait_q = (queue_t*) arg;
-
-    while (1) {
-        request* req = dequeue(wait_q);
-        assert(req != NULL);
-        if (req == NULL) {
-            continue; // No request to process
-        }
-
-        gettimeofday(&req->dispatch_time, NULL); // Record dispatch time
-
-        long dispatch_interval = (req->dispatch_time.tv_sec - req->arrival_time.tv_sec) * 1000 +
-                                 (req->dispatch_time.tv_usec - req->arrival_time.tv_usec) / 1000;
-
-         TODO - Update thread statistics
-        if (is_static_request(req)) {
-            stats->static_count++;
-        } else {
-            stats->dynamic_count++;
-        }
-
-
-        // Process the request
-        requestHandle(req->fd);
-        //TODO - ^MAYBE CHANGE RETURN VALUE OF HANDLE TO BE IS_STATIC (updated by requestParseURI in request.c) TO UPDATE STATS!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-        // Embed statistics in the response headers
-        char headers[1024];
-        snprintf(headers, sizeof(headers),
-                 "Stat-Req-Arrival: %ld.%06ld\r\n"
-                 "Stat-Req-Dispatch: %ld\r\n"
-                 "Stat-Thread-Id: %d\r\n"
-                 "Stat-Thread-Count: %d\r\n"
-                 "Stat-Thread-Static: %d\r\n"
-                 "Stat-Thread-Dynamic: %d\r\n",
-                 req->arrival_time.tv_sec, req->arrival_time.tv_usec,
-                 dispatch_interval,
-                 stats->id,
-                 (stats->static_count + stats->dynamic_count),
-                 stats->static_count,
-                 stats->dynamic_count);
-
-        //send_response(req->fd, headers); // Function to send response with headers
-
-        // Discard the request
-        //TODO - lower num of running requests in queue
-        Close(req->fd);
-        free(req);
-    }
-}
-*/
