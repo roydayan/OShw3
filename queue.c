@@ -133,15 +133,24 @@ void enqueueDropHead(queue_t *q, request_t* new_request) {
     pthread_mutex_unlock(&(q->mutex));
 }
 
-void enqueueBlockFlush(queue_t *q, request_t* new_request){
+void enqueueBlockFlush(queue_t* q, request_t* new_request){
     pthread_mutex_lock(&(q->mutex));
-    while (q->waiting_requests + q->running_requests != 0) {//TODO -- does this cause mutual exclosion ???
-        pthread_cond_wait(&(q->cond_all_done), &(q->mutex));
+    if(q->waiting_requests + q->running_requests == q->max_size){
+
+        while (q->waiting_requests + q->running_requests != 0) {//TODO -- does this cause mutual exclosion ???
+            pthread_cond_wait(&(q->cond_all_done), &(q->mutex));
+        }
+        dropRequest(new_request);
+        pthread_mutex_unlock(&(q->mutex));
+        return;
     }
-    //TODO -- do i need to add the new request to the queue? or discard it?
-    dropRequest(new_request);
-    //pthread_cond_signal(&(q->cond_empty));
-    pthread_mutex_unlock(&(q->mutex));
+    else{
+        insertAtBack(q, new_request);
+        pthread_cond_signal(&(q->cond_empty));
+        pthread_mutex_unlock(&(q->mutex));
+        return;
+    }
+
 }
 
 void enqueueDropRandom(queue_t *q, request_t *new_request){
