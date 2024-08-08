@@ -207,28 +207,16 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     requestReadhdrs(&rio);
 
     //check for skip and change uri accordingly
-    int special_suffix = 0;
     if (strstr(uri, ".skip") != NULL) {
         t_stats->next_req = dequeueLatest(t_stats->wait_q);
-        special_suffix = 1;
+        char *suffix_position = strstr(uri, ".skip");
+        //replace .skip with \0's:
+        for (int i = 0; i < 5; i++) {
+            suffix_position[i] = '\0';
+        }
     }
 
     is_static = requestParseURI(uri, filename, cgiargs);
-
-    //change only filename (not all of uri) if special suffix is found
-    if (special_suffix) {
-        char *suffix_position = strstr(filename, ".skip");
-        if (suffix_position == NULL) { //not supposed to be null because skip is in filename
-            fprintf(stderr, "Error: special suffix found but not found in filename\n");
-        }
-        else {
-            //replace .skip with \0's:
-            for (int i = 0; i < 5; i++) {
-                suffix_position[i] = '\0';
-            }
-        }
-    }
-    //continue handling request
 
     if (stat(filename, &sbuf) < 0) {
         requestError(fd, filename, "404", "Not found", "OS-HW3 Server could not find this file", arrival, dispatch, t_stats);
